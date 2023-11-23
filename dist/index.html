@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>play.ruby-lang.org</title>
+    <link rel="stylesheet" href="build/index.css">
+    <link href="build/tailwind.css" rel="stylesheet">
+
+    <script type="module" src="build/index.js"></script>
+</head>
+
+<body class="bg-white text-gray-700 dark:bg-gray-800 dark:text-gray-300 font-mono">
+    <main class="flex flex-col h-screen">
+        <div class="flex flex-row flex-1 flex-shrink h-full">
+            <div class="flex flex-col" style="width: 50%;">
+                <div class="flex flex-wrap justify-between items-center w-full h-16">
+                    <div id="status" class="ml-6"></div>
+                </div>
+                <div id="editor" class="flex-1"></div>
+            </div>
+            <div class="flex flex-col h-full" style="width: 50%;">
+                <div class="flex flex-row flex-wrap w-full h-16 justify-between items-center space-x-4">
+                    <div>
+                        <button id="button-run"
+                            class="rounded bg-red-500 active:bg-red-600 hover:bg-red-700 text-white py-2 px-4">RUN</button>
+                        <select id="action">
+                            <option value="eval">Evaluate</option>
+                            <option value="compile">Compile</option>
+                            <option value="syntax">Syntax</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-row">
+                        <div id="metadata" class="ml-auto">
+                        </div>
+                        <div class="mx-3">
+                            <a id="revision" class="underline"></a>
+                        </div>
+                    </div>
+                </div>
+                <div id="output"
+                    class="flex-1 rounded-lg font-mono whitespace-pre-wrap break-word bg-gray-200 dark:bg-gray-900"
+                    style="overflow: auto"></div>
+            </div>
+        </div>
+    </main>
+
+</body>
+
+</html>
