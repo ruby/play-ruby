@@ -15,6 +15,10 @@ class GitHubArtifactRegistry {
         }
         const runUrl = `https://api.github.com/repos/${this.repo}/actions/runs/${runId}`
         const runResponse = await fetch(runUrl, { headers })
+        if (!runResponse.ok) {
+            throw new Error(`Failed to fetch ${runUrl}: ${runResponse.statusText}`)
+        }
+
         const run = await runResponse.json()
         const artifactsResponse = await fetch(run["artifacts_url"], { headers })
         const artifacts = await artifactsResponse.json()
@@ -92,44 +96,16 @@ async function authenticate() {
     }
 }
 
-async function init() {
-    const editor = monaco.editor.create(document.getElementById('editor'), {
-        value: ['def hello = puts "Hello"'].join('\n'),
-        language: "ruby",
-        automaticLayout: true,
-        fontSize: 16,
-    });
-
-    editor.setValue(`def hello = puts "Hello"
-hello
-puts "World"
-puts RUBY_DESCRIPTION
-`)
-
-    const buttonRun = document.getElementById("button-run")
-    const output = document.getElementById("output")
-    const action = document.getElementById("action") as HTMLSelectElement
-
+async function initRubyWorkerClass(setStatus: (status: string) => void, setMetadata: (run: any) => void) {
     const { fs } = memfs()
-    const setStatus = (status: string) => {
-        document.getElementById("status").innerText = status
-    }
-    const setMetadata = (run: any) => {
-        const description = `${run["head_commit"]["message"]}`
-        document.getElementById("metadata").innerText = description
-        const revisionElement = document.getElementById("revision") as HTMLAnchorElement
-        revisionElement.innerText = "(" + run["head_commit"]["id"].slice(0, 7) + ")"
-        revisionElement.href = run["html_url"]
-        revisionElement.target = "_blank"
-    }
-
-    setStatus("Authenticating...")
-    await authenticate()
-
     setStatus("Installing Ruby...")
     {
         const query = new URLSearchParams(window.location.search)
         const actionsRunId = query.get("run")
+        if (actionsRunId == null) {
+            setStatus("No GitHub Actions run ID found in URL")
+            return;
+        }
 
         const artifactRegistry = new GitHubArtifactRegistry("ruby/ruby", await caches.open("ruby-wasm-install-v1"), {
             "Authorization": `token ${localStorage.getItem("GITHUB_TOKEN")}`
@@ -148,19 +124,61 @@ puts RUBY_DESCRIPTION
     const RubyWorkerClass = Comlink.wrap(new Worker("build/ruby.worker.js", { type: "module" })) as unknown as {
         new(module: WebAssembly.Module): Promise<RubyWorker>
     }
-    const run = async (code: string) => {
-        const selectedAction = action.value
-        const worker = await new RubyWorkerClass(await rubyModule)
-        output.innerText = ""
-        await worker.run(code, selectedAction, Comlink.proxy((lines) => {
-            output.innerText += lines
-        }))
+    return async () => {
+        return await new RubyWorkerClass(await rubyModule)
+    }
+}
+
+async function init() {
+    const editor = monaco.editor.create(document.getElementById('editor'), {
+        value: ['def hello = puts "Hello"'].join('\n'),
+        language: "ruby",
+        automaticLayout: true,
+        fontSize: 16,
+    });
+
+    editor.setValue(`def hello = puts "Hello"
+hello
+puts "World"
+puts RUBY_DESCRIPTION
+`)
+
+    const buttonRun = document.getElementById("button-run")
+    const output = document.getElementById("output")
+    const action = document.getElementById("action") as HTMLSelectElement
+
+    const setStatus = (status: string) => {
+        document.getElementById("status").innerText = status
+    }
+    const setMetadata = (run: any) => {
+        const description = `${run["head_commit"]["message"]}`
+        document.getElementById("metadata").innerText = description
+        const revisionElement = document.getElementById("revision") as HTMLAnchorElement
+        revisionElement.innerText = "(" + run["head_commit"]["id"].slice(0, 7) + ")"
+        revisionElement.href = run["html_url"]
+        revisionElement.target = "_blank"
     }
 
-    buttonRun.addEventListener("click", () => {
-        const text = editor.getValue()
-        run(text)
-    })
+    setStatus("Authenticating...")
+    await authenticate()
+    try {
+        const makeRubyWorker = await initRubyWorkerClass(setStatus, setMetadata)
+        const run = async (code: string) => {
+            const selectedAction = action.value
+            const worker = await makeRubyWorker()
+            output.innerText = ""
+            await worker.run(code, selectedAction, Comlink.proxy((lines) => {
+                output.innerText += lines
+            }))
+        }
+
+        buttonRun.addEventListener("click", () => {
+            const text = editor.getValue()
+            run(text)
+        })
+    } catch (error) {
+        setStatus(error.message)
+    }
     console.log("init")
 }
 
