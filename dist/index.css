@@ -129,17 +129,27 @@ main {
     background-color: #ffffff;
 }
 
-.plrb-tools-more-tools-dropdown {
-    position: absolute;
-    background-color: #f9f9f9;
-    min-width: 160px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-    z-index: 1;
+.plrb-tools-help-button {
+    border-width: 1px;
+    border-radius: 0.25rem;
+    background-color: #6c757d;
+    font-size: 100%;
+    font-family: inherit;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    white-space: nowrap;
+    color: #ffffff;
+
+    margin-left: auto;
+    margin-right: 1rem;
 }
 
-.plrb-tools-more-tools-dropdown .plrb-tools-more-tools-dropdown-item {
-    float: none;
-    display: block;
+.plrb-tools-help-button:hover {
+    background-color: #5a6268;
+}
+
+.plrb-tools-help-button:active {
+    background-color: #4e555b;
 }
 
 @media screen and (max-width: 768px) {
