@@ -68,7 +68,6 @@ async function initRubyWorkerClass(setStatus: (status: string) => void, setMetad
     const zipResponse = await artifactRegistry.get(artifact["archive_download_url"])
     const zipBuffer = await zipResponse.arrayBuffer();
 
-    setStatus("Ready")
     const RubyWorkerClass = Comlink.wrap(new Worker("build/ruby.worker.js", { type: "module" })) as unknown as {
         create(zipBuffer: ArrayBuffer, setStatus: (message: string) => void): Promise<RubyWorker>
     }
