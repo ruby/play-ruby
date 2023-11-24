@@ -23,22 +23,11 @@ switch (action) {
         const ctx = await esbuild.context(buildOptions)
         const build = ctx.watch()
         spawn("ruby", ["-run", "-e", "httpd", "./dist"], { stdio: "inherit" })
-        spawn(
-            "npx",
-            ["tailwindcss", "-i", "src/index.css", "-o", "dist/build/tailwind.css", "--watch"],
-            { stdio: "inherit" }
-        )
         await build
         break
     }
     case "build": {
-        const build = esbuild.build(buildOptions)
-        spawn(
-            "npx",
-            ["tailwindcss", "-i", "src/index.css", "-o", "dist/build/tailwind.css"],
-            { stdio: "inherit" }
-        )
-        await build
+        await esbuild.build(buildOptions)
         break
     }
     default:
