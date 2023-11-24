@@ -72,6 +72,7 @@ main {
     border-top-right-radius: 0.25rem;
     border-bottom-right-radius: 0.25rem;
     border-width: 1px;
+    border-color: rgb(118, 118, 118);
     background-color: var(--plrb-color-primary);
     color: #ffffff;
     font-size: 100%;
@@ -91,7 +92,10 @@ main {
 .plrb-tools-more-tools-button {
     border-top-left-radius: 0.25rem;
     border-bottom-left-radius: 0.25rem;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
     border-width: 1px;
+    border-color: rgb(118, 118, 118);
     background-color: #6c757d;
     font-size: 100%;
     font-family: inherit;
