@@ -1,8 +1,5 @@
-* {
-    box-sizing: border-box;
-    border-width: 0;
-    border-style: solid;
-    border-color: #e5e7eb;
+:root {
+    --plrb-color-primary: rgb(239 68 68);
 }
 
 body {
@@ -23,21 +20,21 @@ main {
     height: 100vh;
 }
 
-.playruby-pane-container {
+.plrb-pane-container {
     display: flex;
     flex-direction: row;
     flex-grow: 1;
     height: 100%;
 }
 
-.playruby-editor-status-group {
+.plrb-editor-status-group {
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 50%;
 }
 
-.playruby-status-pane {
+.plrb-status-pane {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
@@ -46,22 +43,22 @@ main {
     height: 4rem;
 }
 
-.playruby-status-message {
+.plrb-status-message {
     margin-left: 1.5rem;
 }
 
-.playruby-editor-pane {
+.plrb-editor-pane {
     flex: 1 1 0%;
 }
 
-.playruby-tools-output-group {
+.plrb-tools-output-group {
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 50%;
 }
 
-.playruby-tools-pane {
+.plrb-tools-pane {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -71,43 +68,44 @@ main {
     align-items: center;
 }
 
-.playruby-tools-run-button {
+.plrb-tools-run-button {
     border-radius: 0.25rem;
-    background-color: rgb(239 68 68);
+    border-color: transparent;
+    background-color: var(--plrb-color-primary);
     color: #ffffff;
     font-size: 100%;
     padding: 0.5rem 1rem;
 }
 
-.playruby-tools-run-button:hover {
+.plrb-tools-run-button:hover {
     background-color: rgb(185 28 28);
 }
 
-.playruby-tools-run-button:active {
+.plrb-tools-run-button:active {
     background-color: rgb(220 38 38);
 }
 
-.playruby-tools-action-select {
+.plrb-tools-action-select {
     font-size: 100%;
     font-family: inherit;
 }
 
-.playruby-tools-metadata-group {
+.plrb-tools-metadata-group {
     display: flex;
     flex-direction: row;
 }
 
-.playruby-tools-metadata-message {
+.plrb-tools-metadata-message {
     margin-left: auto;
 }
 
-.playruby-tools-metadata-revision {
+.plrb-tools-metadata-revision {
     margin-left: 0.75rem;
     margin-right: 0.75rem;
     text-decoration-line: underline;
 }
 
-.playruby-output-pane {
+.plrb-output-pane {
     flex: 1 1 0%;
     overflow: auto;
     padding: 1rem;
