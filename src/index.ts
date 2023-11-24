@@ -102,7 +102,12 @@ async function initRubyWorkerClass(setStatus: (status: string) => void, setMetad
     }
 }
 
-function initEditor() {
+type UIState = {
+    code: string,
+    action: string,
+}
+
+function initEditor(state: UIState) {
     const editor = monaco.editor.create(document.getElementById('editor'), {
         value: ['def hello = puts "Hello"'].join('\n'),
         language: "ruby",
@@ -121,16 +126,35 @@ function initEditor() {
     }
     window.addEventListener("resize", layoutEditor)
 
-    editor.setValue(`def hello = puts "Hello"
-hello
-puts "World"
-puts RUBY_DESCRIPTION
-`)
+    editor.setValue(state.code)
+    editor.onDidChangeModelContent(() => {
+        const url = new URL(window.location.href)
+        url.searchParams.set("code", editor.getValue())
+        window.history.replaceState({}, "", url.toString())
+    })
 
     return editor;
 }
 
-function initUI() {
+function stateFromURL(): UIState {
+    const query = new URLSearchParams(window.location.search)
+    let code = query.get("code")
+    if (code == null) {
+        code = `def hello = puts "Hello"
+hello
+puts "World"
+puts RUBY_DESCRIPTION`
+    }
+
+    let action = query.get("action")
+    if (action == null) {
+        action = "eval"
+    }
+
+    return { code, action }
+}
+
+function initUI(state: UIState) {
     const showHelpButton = document.getElementById("button-show-help")
     const helpModal = document.getElementById("modal-help") as HTMLDialogElement
     showHelpButton.addEventListener("click", () => {
@@ -162,11 +186,18 @@ function initUI() {
 }
 
 async function init() {
-    initUI();
-    const editor = initEditor()
+    const uiState = stateFromURL();
+    initUI(uiState);
+    const editor = initEditor(uiState)
     const buttonRun = document.getElementById("button-run")
-    const output = document.getElementById("output")
-    const action = document.getElementById("action") as HTMLSelectElement
+    const outputPane = document.getElementById("output")
+    const actionSelect = document.getElementById("action") as HTMLSelectElement
+    actionSelect.value = uiState.action
+    actionSelect.addEventListener("change", () => {
+        const url = new URL(window.location.href)
+        url.searchParams.set("action", actionSelect.value)
+        window.history.replaceState({}, "", url.toString())
+    })
 
     const setStatus = (status: string) => {
         document.getElementById("status").innerText = status
@@ -188,11 +219,11 @@ async function init() {
         }
         const worker = await makeRubyWorker()
         const writeOutput = (message: string) => {
-            output.innerText += message
+            outputPane.innerText += message
         }
         const run = async (code: string) => {
-            const selectedAction = action.value
-            output.innerText = ""
+            const selectedAction = actionSelect.value
+            outputPane.innerText = ""
             await worker.run(code, selectedAction, Comlink.proxy(writeOutput))
         }
 
