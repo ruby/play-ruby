@@ -13,7 +13,7 @@ class GitHubArtifactRegistry {
         const runUrl = `https://api.github.com/repos/${this.repo}/actions/runs/${runId}`
         const runResponse = await fetch(runUrl, { headers })
         if (!runResponse.ok) {
-            throw new Error(`Failed to fetch ${runUrl}: ${runResponse.statusText}`)
+            throw new Error(`Metadata fetch error: ${runResponse.status}`)
         }
 
         const run = await runResponse.json()
