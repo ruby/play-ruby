@@ -17,20 +17,25 @@
             <div class="plrb-editor-status-group">
                 <div class="plrb-status-pane">
                     <div id="status" class="plrb-status-message"></div>
+                    <div class="plrb-tools-metadata-message">
+                        <a id="metadata" class="plrb-tools-metadata-revision"></a></span>
+                    </div>
                 </div>
                 <div id="editor" class="plrb-editor-pane"></div>
             </div>
             <div class="plrb-tools-output-group">
                 <div class="plrb-tools-pane">
-                    <button id="button-run" class="plrb-tools-run-button">RUN</button>
+                    <button id="button-run" class="plrb-tools-run-button">
+                        RUN
+                        <svg width="16" height="12">
+                            <polygon points="6 0, 12 12, 0 12" fill="white" transform="rotate(90 8 8)"/>
+                        </svg>
+                    </button>
                     <select id="action" class="plrb-tools-action-select">
                         <option value="eval">Evaluate</option>
                         <option value="compile">Compile</option>
                         <option value="syntax">Syntax</option>
                     </select>
-                    <div class="plrb-tools-metadata-message">
-                        <a id="metadata" class="plrb-tools-metadata-revision"></a></span>
-                    </div>
                 </div>
                 <div id="output" class="plrb-output-pane"></div>
             </div>
