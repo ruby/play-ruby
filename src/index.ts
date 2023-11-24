@@ -129,7 +129,22 @@ puts RUBY_DESCRIPTION
     return editor;
 }
 
+function initUI() {
+    const showHelpButton = document.getElementById("button-show-help")
+    const helpModal = document.getElementById("modal-help") as HTMLDialogElement
+    showHelpButton.addEventListener("click", () => {
+        helpModal.showModal()
+    })
+    helpModal.addEventListener("click", (event) => {
+        if (event.target === helpModal) {
+            // Clicked on the modal backdrop
+            helpModal.close()
+        }
+    })
+}
+
 async function init() {
+    initUI();
     const editor = initEditor()
     const buttonRun = document.getElementById("button-run")
     const output = document.getElementById("output")

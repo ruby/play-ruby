@@ -37,13 +37,35 @@
                             </svg>
                         </button>
                     </div>
-                    <button id="show-help" class="plrb-tools-help-button">?</button>
+                    <button id="button-show-help" class="plrb-tools-help-button">?</button>
                 </div>
                 <div id="output" class="plrb-output-pane"></div>
             </div>
         </div>
     </main>
 
+    <dialog id="modal-help" class="plrb-modal-help">
+        <div class="plrb-modal-help-content">
+            <form method="dialog">
+                <button class="plrb-modal-help-close-button">X</button>
+                <h1>Help</h1>
+                <h2>GitHub Personal Access Token</h2>
+                <p>
+                    If you want to try a Ruby built from a GitHub Action workflow, you need to set a GitHub Personal Access Token (PAT) at first.
+                    Please <a href="https://github.com/settings/tokens/new?scopes=public_repo&description=play.ruby-lang.org" target="_blank">create a new PAT</a> with the <code>public_repo</code> scope and set it when you open this page.
+                </p>
+                <h2>Security</h2>
+                <p>
+                    This site uses <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage" target="_blank">localStorage</a> to store your code and GitHub Personal Access Token (PAT).
+                    The token will not be sent to any server except GitHub.
+                </p>
+                <h2>Privacy Policy</h2>
+                <p>
+                    This site <strong>does not</strong> collect any personal information, such as your IP address and code you entered.
+                </p>
+            </form>
+        </div>
+    </dialog>
 </body>
 
 </html>

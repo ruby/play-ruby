@@ -152,6 +152,32 @@ main {
     background-color: #4e555b;
 }
 
+.plrb-modal-help {
+    border-radius: 0.5rem;
+}
+
+.plrb-modal-help-content {
+    background-color: #ffffff;
+    padding: 1rem;
+    width: 50vw;
+    height: 50vh;
+    overflow: auto;
+}
+
+.plrb-modal-help-close-button {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin: 0.5rem;
+    border: transparent;
+    background-color: transparent;
+    font-size: 100%;
+    font-family: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: underline;
+}
+
 @media screen and (max-width: 768px) {
     .plrb-editor-pane {
         height: 50vh;
