@@ -129,7 +129,7 @@ main {
     background-color: #ffffff;
 }
 
-.plrb-tools-help-button {
+.plrb-icon-button {
     border-width: 1px;
     border-radius: 0.25rem;
     background-color: #6c757d;
@@ -139,24 +139,30 @@ main {
     padding: 0.5rem 1rem;
     white-space: nowrap;
     color: #ffffff;
+}
 
+.plrb-icon-button:hover {
+    background-color: #5a6268;
+}
+
+.plrb-icon-button:active {
+    background-color: #4e555b;
+}
+
+.plrb-tools-config-button {
     margin-left: auto;
     margin-right: 1rem;
 }
 
-.plrb-tools-help-button:hover {
-    background-color: #5a6268;
+.plrb-tools-help-button {
+    margin-right: 1rem;
 }
 
-.plrb-tools-help-button:active {
-    background-color: #4e555b;
-}
-
-.plrb-modal-help {
+.plrb-modal {
     border-radius: 0.5rem;
 }
 
-.plrb-modal-help-content {
+.plrb-modal-content {
     background-color: #ffffff;
     padding: 1rem;
     width: 50vw;
@@ -164,7 +170,7 @@ main {
     overflow: auto;
 }
 
-.plrb-modal-help-close-button {
+.plrb-modal-close-button {
     position: absolute;
     top: 0;
     right: 0;
@@ -176,6 +182,10 @@ main {
     font-weight: 600;
     white-space: nowrap;
     text-decoration: underline;
+}
+
+.plrb-modal-config-input {
+    width: 90%;
 }
 
 @media screen and (max-width: 768px) {

@@ -58,7 +58,8 @@ function teeDownloadProgress(response: Response, setProgress: (bytes: number) =>
 
 
 async function authenticate() {
-    if (localStorage.getItem("GITHUB_TOKEN") == null) {
+    const stored = localStorage.getItem("GITHUB_TOKEN");
+    if (stored == null || stored === "") {
         const token = prompt("GitHub Personal Access Token")
         if (token == null) {
             throw new Error("No GitHub Personal Access Token")
@@ -135,12 +136,29 @@ function initUI() {
     showHelpButton.addEventListener("click", () => {
         helpModal.showModal()
     })
-    helpModal.addEventListener("click", (event) => {
-        if (event.target === helpModal) {
-            // Clicked on the modal backdrop
-            helpModal.close()
-        }
+
+    const showConfigButton = document.getElementById("button-show-config")
+    const configModal = document.getElementById("modal-config") as HTMLDialogElement
+    const configGithubToken = document.getElementById("config-github-token") as HTMLInputElement
+    showConfigButton.addEventListener("click", () => {
+        configGithubToken.value = localStorage.getItem("GITHUB_TOKEN") ?? ""
+        configModal.showModal()
     })
+    const configForm = document.getElementById("config-form") as HTMLFormElement
+    configForm.addEventListener("submit", (event) => {
+        event.preventDefault()
+        localStorage.setItem("GITHUB_TOKEN", configGithubToken.value)
+        configModal.close()
+    })
+
+    for (const modal of [helpModal, configModal]) {
+        modal.addEventListener("click", (event) => {
+            if (event.target === modal) {
+                // Clicked on the modal backdrop
+                modal.close()
+            }
+        })
+    }
 }
 
 async function init() {
