@@ -69,10 +69,6 @@ main {
     align-items: center;
 }
 
-.plrb-tools-controls {
-    text-wrap: nowrap;
-}
-
 .plrb-tools-run-button {
     border-radius: 0.25rem;
     border-color: transparent;
@@ -80,6 +76,7 @@ main {
     color: #ffffff;
     font-size: 100%;
     padding: 0.5rem 1rem;
+    margin: 0 1rem;
 }
 
 .plrb-tools-run-button:hover {
