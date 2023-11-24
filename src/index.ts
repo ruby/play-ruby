@@ -39,6 +39,23 @@ class GitHubArtifactRegistry {
     }
 }
 
+function teeDownloadProgress(response: Response, setProgress: (bytes: number) => void): Response {
+    let loaded = 0
+    return new Response(new ReadableStream({
+        async start(controller) {
+            const reader = response.body.getReader();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                loaded += value.byteLength;
+                setProgress(loaded);
+                controller.enqueue(value);
+            }
+            controller.close();
+        },
+    }));
+}
+
 
 async function authenticate() {
     if (localStorage.getItem("GITHUB_TOKEN") == null) {
@@ -64,7 +81,16 @@ async function initRubyWorkerClass(setStatus: (status: string) => void, setMetad
     })
     const { run, artifact } = await artifactRegistry.getMetadata(actionsRunId!, "ruby-wasm-install")
     setMetadata(run)
-    const zipResponse = await artifactRegistry.get(artifact["archive_download_url"])
+
+    setStatus("Downloading Ruby...")
+    const zipResponse = teeDownloadProgress(
+        await artifactRegistry.get(artifact["archive_download_url"]),
+        (bytes) => {
+            const total = Number(artifact["size_in_bytes"])
+            const percent = Math.round(bytes / total * 100)
+            setStatus(`Downloading Ruby... ${percent}%`)
+        }
+    )
     const zipBuffer = await zipResponse.arrayBuffer();
 
     const RubyWorkerClass = Comlink.wrap(new Worker("build/ruby.worker.js", { type: "module" })) as unknown as {
@@ -113,12 +139,13 @@ puts RUBY_DESCRIPTION
             return
         }
         const worker = await makeRubyWorker()
+        const writeOutput = (message: string) => {
+            output.innerText += message
+        }
         const run = async (code: string) => {
             const selectedAction = action.value
             output.innerText = ""
-            await worker.run(code, selectedAction, Comlink.proxy((lines) => {
-                output.innerText += lines
-            }))
+            await worker.run(code, selectedAction, Comlink.proxy(writeOutput))
         }
 
         buttonRun.addEventListener("click", () => {
