@@ -1,5 +1,9 @@
 :root {
     --plrb-color-primary: rgb(239 68 68);
+    --plrb-color-primary-hover: rgb(185 28 28);
+    --plrb-color-primary-active: rgb(220 38 38);
+
+    --plrb-status-tools-height: 4rem;
 }
 
 body {
@@ -40,7 +44,7 @@ main {
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    height: 4rem;
+    height: var(--plrb-status-tools-height);
 }
 
 .plrb-status-message {
@@ -63,7 +67,7 @@ main {
     flex-direction: row;
     flex-wrap: wrap;
     width: 100%;
-    height: 4rem;
+    height: var(--plrb-status-tools-height);
     justify-content: space-between;
     align-items: center;
 }
@@ -78,11 +82,11 @@ main {
 }
 
 .plrb-tools-run-button:hover {
-    background-color: rgb(185 28 28);
+    background-color: var(--plrb-color-primary-hover);
 }
 
 .plrb-tools-run-button:active {
-    background-color: rgb(220 38 38);
+    background-color: var(--plrb-color-primary-active);
 }
 
 .plrb-tools-action-select {
