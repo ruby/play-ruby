@@ -109,21 +109,30 @@ main {
 
 .plrb-output-pane {
     flex: 1 1 0%;
-    overflow: auto;
+    overflow-wrap: break-word;
     padding: 1rem;
     border-radius: 0.5rem;
     background-color: rgb(229 231 235);
 }
 
 @media screen and (max-width: 768px) {
+    .plrb-editor-pane {
+        height: 50vh;
+    }
     .plrb-pane-container {
-        flex-direction: column;
+        display: block;
     }
     .plrb-editor-status-group {
         width: 100%;
+        height: 50vh;
     }
-
     .plrb-tools-output-group {
+        display: block;
         width: 100%;
+        height: 50%;
+    }
+    .plrb-output-pane {
+        overflow: visible;
+        min-height: 30vh;
     }
 }
