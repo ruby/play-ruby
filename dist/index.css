@@ -19,8 +19,6 @@ body {
 }
 
 main {
-    display: flex;
-    flex-direction: column;
     height: 100vh;
 }
 
@@ -115,4 +113,17 @@ main {
     padding: 1rem;
     border-radius: 0.5rem;
     background-color: rgb(229 231 235);
+}
+
+@media screen and (max-width: 768px) {
+    .plrb-pane-container {
+        flex-direction: column;
+    }
+    .plrb-editor-status-group {
+        width: 100%;
+    }
+
+    .plrb-tools-output-group {
+        width: 100%;
+    }
 }

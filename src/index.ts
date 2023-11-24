@@ -101,13 +101,24 @@ async function initRubyWorkerClass(setStatus: (status: string) => void, setMetad
     }
 }
 
-async function init() {
+function initEditor() {
     const editor = monaco.editor.create(document.getElementById('editor'), {
         value: ['def hello = puts "Hello"'].join('\n'),
         language: "ruby",
-        automaticLayout: true,
         fontSize: 16,
     });
+
+    const layoutEditor = () => {
+        // 1. Squash the editor to 0x0 to layout the parent container
+        editor.layout({ width: 0, height: 0 })
+        // 2. Wait for the next animation frame to ensure the parent container has been laid out
+        window.requestAnimationFrame(() => {
+            // 3. Resize the editor to fill the parent container
+            const { width, height } = editor.getContainerDomNode().getBoundingClientRect()
+            editor.layout({ width, height })
+        })
+    }
+    window.addEventListener("resize", layoutEditor)
 
     editor.setValue(`def hello = puts "Hello"
 hello
@@ -115,6 +126,11 @@ puts "World"
 puts RUBY_DESCRIPTION
 `)
 
+    return editor;
+}
+
+async function init() {
+    const editor = initEditor()
     const buttonRun = document.getElementById("button-run")
     const output = document.getElementById("output")
     const action = document.getElementById("action") as HTMLSelectElement
