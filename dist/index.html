@@ -25,17 +25,18 @@
             </div>
             <div class="plrb-tools-output-group">
                 <div class="plrb-tools-pane">
-                    <button id="button-run" class="plrb-tools-run-button">
-                        RUN
-                        <svg width="16" height="12">
-                            <polygon points="6 0, 12 12, 0 12" fill="white" transform="rotate(90 8 8)"/>
-                        </svg>
-                    </button>
-                    <select id="action" class="plrb-tools-action-select">
-                        <option value="eval">Evaluate</option>
-                        <option value="compile">Compile</option>
-                        <option value="syntax">Syntax</option>
-                    </select>
+                    <div class="plrb-tools-button-group">
+                        <select id="action" class="plrb-tools-more-tools-button">
+                            <option label="" value="eval">Evaluate</option>
+                            <option label="" value="compile">Compile</option>
+                            <option label="" value="syntax">Syntax</option>
+                        </select>
+                        <button id="button-run" class="plrb-tools-do-button">
+                            <svg width="16" height="12" style="padding-top: 2px;">
+                                <polygon points="6 0, 12 12, 0 12" fill="white" transform="rotate(90 8 8)" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <div id="output" class="plrb-output-pane"></div>
             </div>
