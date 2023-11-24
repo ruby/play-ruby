@@ -183,7 +183,7 @@ export class RubyWorker {
 
         const wasi = new WASI(
             ["ruby", "--disable=gems", "-e", code].concat(extraArgs),
-            ["RUBY_FIBER_MACHINE_STACK_SIZE=" + String(1024 * 1024 * 20)],
+            [],
             [
                 new OpenFile(new File([])), // stdin
                 new OpenFile(new File([])), // stdout
