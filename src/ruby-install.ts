@@ -1,6 +1,10 @@
 import { ZipReader } from "@zip.js/zip.js"
-import { type IFs } from "memfs"
 import * as tar from "tar-stream"
+
+export type IFs = {
+    mkdirSync(path: string, options?: any): void
+    writeFileSync(path: string, data: any, options?: any): void
+}
 
 export class RubyInstall {
     constructor(private setStatus: (status: string) => void = () => { }) { }
@@ -32,16 +36,34 @@ export class RubyInstall {
 
         this.setStatus("Installing...")
 
+        const dataWorks = []
         for await (const entry of tarExtract) {
             const header = entry.header;
             const path = header.name
             if (header.type === "directory") {
                 fs.mkdirSync(path, { recursive: true })
             } else if (header.type === "file") {
-                fs.writeFileSync(path, entry.read())
+                const dataWork = new Promise<void>((resolve, reject) => {
+                    const chunks: Uint8Array[] = []
+                    entry.on("data", (chunk) => {
+                        chunks.push(chunk)
+                    })
+                    entry.on("end", () => {
+                        const data = Buffer.concat(chunks)
+                        fs.writeFileSync(path, data)
+                        resolve()
+                    })
+                    entry.on("error", (err) => {
+                        reject(err)
+                    })
+                })
+                dataWorks.push(dataWork)
+            } else {
+                throw new Error(`Unknown entry type ${header.type}`)
             }
             entry.resume()
         }
+        await Promise.all(dataWorks)
         this.setStatus("Installed")
     }
 }

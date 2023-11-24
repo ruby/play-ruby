@@ -3,13 +3,13 @@
     "build": "node ./bin/build.mjs"
   },
   "dependencies": {
+    "@bjorn3/browser_wasi_shim": "^0.2.16",
     "@zip.js/zip.js": "^2.7.31",
     "comlink": "^4.4.1",
     "esbuild-plugin-polyfill-node": "^0.3.0",
     "memfs": "^4.6.0",
     "monaco-editor": "^0.44.0",
-    "tar-stream": "^3.1.6",
-    "uwasi": "^1.1.0"
+    "tar-stream": "^3.1.6"
   },
   "devDependencies": {
     "@types/tar-stream": "^3.1.3",
