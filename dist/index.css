@@ -63,11 +63,14 @@ main {
 .plrb-tools-pane {
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
     width: 100%;
     height: var(--plrb-status-tools-height);
     justify-content: space-between;
     align-items: center;
+}
+
+.plrb-tools-controls {
+    text-wrap: nowrap;
 }
 
 .plrb-tools-run-button {
@@ -92,18 +95,15 @@ main {
     font-family: inherit;
 }
 
-.plrb-tools-metadata-group {
-    display: flex;
-    flex-direction: row;
-}
-
 .plrb-tools-metadata-message {
+    padding: 0 1rem;
     margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .plrb-tools-metadata-revision {
-    margin-left: 0.75rem;
-    margin-right: 0.75rem;
     text-decoration-line: underline;
 }
 

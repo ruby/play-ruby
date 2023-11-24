@@ -140,11 +140,10 @@ async function init() {
     }
     const setMetadata = (run: any) => {
         const description = `${run["head_commit"]["message"]}`
-        document.getElementById("metadata").innerText = description
-        const revisionElement = document.getElementById("revision") as HTMLAnchorElement
-        revisionElement.innerText = "(" + run["head_commit"]["id"].slice(0, 7) + ")"
-        revisionElement.href = run["html_url"]
-        revisionElement.target = "_blank"
+        const metadataElement = document.getElementById("metadata") as HTMLAnchorElement
+        metadataElement.innerText = run["head_commit"]["id"].slice(0, 7) + ": " + description
+        metadataElement.href = run["html_url"]
+        metadataElement.target = "_blank"
     }
 
     setStatus("Authenticating...")
