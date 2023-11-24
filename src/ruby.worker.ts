@@ -1,6 +1,5 @@
 import { Directory, File, OpenFile, PreopenDirectory, SyncOPFSFile, WASI, strace } from "@bjorn3/browser_wasi_shim"
 import * as Comlink from "comlink"
-import { memfs } from "memfs"
 import { IFs, RubyInstall } from "./ruby-install"
 
 

@@ -1,7 +1,6 @@
 import * as monaco from "monaco-editor"
 import * as Comlink from "comlink"
 import type { RubyWorker } from "./ruby.worker"
-import { RubyInstall } from "./ruby-install"
 
 class GitHubArtifactRegistry {
     constructor(private repo: string, private cache: Cache, private headers: HeadersInit) { }
