@@ -57,7 +57,7 @@ async function initRubyWorkerClass(setStatus: (status: string) => void, setMetad
     const actionsRunId = query.get("run")
     if (actionsRunId == null) {
         setStatus("No GitHub Actions run ID found in URL")
-        return;
+        return null;
     }
 
     const artifactRegistry = new GitHubArtifactRegistry("ruby/ruby", await caches.open("ruby-wasm-install-v1"), {
@@ -111,6 +111,9 @@ puts RUBY_DESCRIPTION
     await authenticate()
     try {
         const makeRubyWorker = await initRubyWorkerClass(setStatus, setMetadata)
+        if (makeRubyWorker == null) {
+            return
+        }
         const worker = await makeRubyWorker()
         const run = async (code: string) => {
             const selectedAction = action.value
