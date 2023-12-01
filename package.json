@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "build": "node ./bin/build.mjs"
+    "build": "node ./bin/build.mjs",
+    "serve": "node ./bin/build.mjs dev"
   },
   "dependencies": {
     "@bjorn3/browser_wasi_shim": "^0.2.16",
