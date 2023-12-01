@@ -201,12 +201,22 @@ export class RubyWorker {
         printer.addToImports(imports)
 
         {
-            // WORKAROUND: browser_wasi_shim does not support fd_fdstat_set_flags yet
+            // WORKAROUND: browser_wasi_shim does not support some syscalls yet
             // and returns -1 instead of proper ERRNO values and it results in confusing
             // error messages "Success -- /path/to/file".
-            imports["wasi_snapshot_preview1"]["fd_fdstat_set_flags"] = (fd, flags) => {
-                return 58; // ENOTSUP
-            };
+            // Update browser_wasi_shim version when my fix[^1] will be released.
+            // [^1]: https://github.com/bjorn3/browser_wasi_shim/commit/6193f7482633ef818604375d9755ded67946adfc
+            const syscalls = imports["wasi_snapshot_preview1"]
+            for (const name of Object.keys(syscalls)) {
+                const original = syscalls[name];
+                syscalls[name] = (...args: any[]) => {
+                    const result = original(...args);
+                    if (result === -1) {
+                        return 58; // ENOTSUP
+                    }
+                    return result;
+                };
+            }
         }
 
         const instnace: any = await WebAssembly.instantiate(this.module, imports);
