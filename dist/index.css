@@ -212,4 +212,8 @@ main {
         overflow: visible;
         min-height: 30vh;
     }
+    .plrb-modal-content {
+        width: 80vw;
+        height: 60vh;
+    }
 }
