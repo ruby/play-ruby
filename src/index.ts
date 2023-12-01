@@ -2,9 +2,46 @@ import * as monaco from "monaco-editor"
 import * as Comlink from "comlink"
 import type { RubyWorker } from "./ruby.worker"
 
+/**
+ * Provides access to GitHub Actions artifacts
+ */
 class GitHubArtifactRegistry {
     constructor(private repo: string, private cache: Cache, private headers: HeadersInit) { }
 
+    async getPullRequestLatestRunId(prNumber: string, workflowPath: string) {
+        const headers = {
+            "Accept": "application/vnd.github.v3+json",
+            ...this.headers,
+        }
+        const prUrl = `https://api.github.com/repos/${this.repo}/pulls/${prNumber}`
+        const prResponse = await fetch(prUrl, { headers })
+        if (!prResponse.ok) {
+            throw new Error(`Pull request fetch error: ${prResponse.status}`)
+        }
+        const pr = await prResponse.json()
+        const headSha = pr["head"]["sha"]
+
+        const runsUrl = `https://api.github.com/repos/${this.repo}/actions/runs?event=pull_request&head_sha=${headSha}`
+        const runsResponse = await fetch(runsUrl, { headers })
+        if (!runsResponse.ok) {
+            throw new Error(`Runs fetch error: ${runsResponse.status}`)
+        }
+        const runs = await runsResponse.json()
+
+        for (const run of runs["workflow_runs"]) {
+            if (run["path"] === workflowPath) {
+                return run["id"]
+            }
+        }
+        throw new Error(`No run for ${workflowPath} in PR ${prNumber}`)
+    }
+
+    /**
+     * Fetches the metadata for a GitHub Actions run and returns the metadata for the given artifact
+     * @param runId The ID of the GitHub Actions run
+     * @param artifactName The name of the artifact
+     * @returns The metadata for the artifact in the given run
+     */
     async getMetadata(runId: string, artifactName: string) {
         const headers = {
             "Accept": "application/vnd.github.v3+json",
@@ -27,6 +64,9 @@ class GitHubArtifactRegistry {
         return { run, artifact }
     }
 
+    /**
+     * Returns the artifact at the given URL, either from the cache or by downloading it
+     */
     async get(artifactUrl: string) {
         let response = await this.cache.match(artifactUrl)
         if (response == null || !response.ok) {
@@ -39,6 +79,9 @@ class GitHubArtifactRegistry {
     }
 }
 
+/**
+ * Passes through a response, but also calls setProgress with the number of bytes downloaded
+ */
 function teeDownloadProgress(response: Response, setProgress: (bytes: number) => void): Response {
     let loaded = 0
     return new Response(new ReadableStream({
@@ -70,16 +113,23 @@ async function authenticate() {
 
 async function initRubyWorkerClass(setStatus: (status: string) => void, setMetadata: (run: any) => void) {
     setStatus("Installing Ruby...")
-    const query = new URLSearchParams(window.location.search)
-    const actionsRunId = query.get("run")
-    if (actionsRunId == null) {
-        setStatus("No GitHub Actions run ID found in URL")
+    const rubySource = rubySourceFromURL()
+    if (rubySource == null) {
+        setStatus("No ?run= or ?pr= query parameter")
         return null;
     }
 
     const artifactRegistry = new GitHubArtifactRegistry("ruby/ruby", await caches.open("ruby-wasm-install-v1"), {
         "Authorization": `token ${localStorage.getItem("GITHUB_TOKEN")}`
     })
+
+    let actionsRunId: string | null = null
+    if (rubySource.type === "github-actions-run") {
+        actionsRunId = rubySource.runId
+    } else if (rubySource.type === "github-pull-request") {
+        actionsRunId = await artifactRegistry.getPullRequestLatestRunId(rubySource.prNumber, ".github/workflows/wasm.yml")
+    }
+
     const { run, artifact } = await artifactRegistry.getMetadata(actionsRunId!, "ruby-wasm-install")
     setMetadata(run)
 
@@ -100,6 +150,26 @@ async function initRubyWorkerClass(setStatus: (status: string) => void, setMetad
     return async () => {
         return await RubyWorkerClass.create(zipBuffer, Comlink.proxy(setStatus))
     }
+}
+
+type RubySource = {
+    type: "github-actions-run",
+    runId: string,
+} | {
+    type: "github-pull-request",
+    prNumber: string,
+}
+
+function rubySourceFromURL(): RubySource | null {
+    const query = new URLSearchParams(window.location.search)
+    for (const [key, value] of query.entries()) {
+        if (key === "run") {
+            return { type: "github-actions-run", runId: value }
+        } else if (key === "pr") {
+            return { type: "github-pull-request", prNumber: value }
+        }
+    }
+    return null
 }
 
 type UIState = {
