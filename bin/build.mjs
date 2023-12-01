@@ -26,6 +26,7 @@ async function downloadBuiltinRuby(version) {
     if (fs.existsSync(destination)) {
         return
     }
+    fs.mkdirSync("./dist/build", { recursive: true })
 
     async function downloadUrl(url, destination) {
         const response = await new Promise((resolve, reject) => {
