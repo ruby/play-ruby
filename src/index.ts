@@ -2,6 +2,16 @@ import * as monaco from "monaco-editor"
 import * as Comlink from "comlink"
 import type { RubyWorker } from "./ruby.worker"
 
+class GitHubAPIError extends Error {
+    constructor(context: string, public response: Response) {
+        super(`GitHub API error (${context}): ${response.status} ${response.statusText}`)
+    }
+
+    isUnauthorized() {
+        return this.response.status === 401
+    }
+}
+
 /**
  * Provides access to GitHub Actions artifacts
  */
@@ -16,7 +26,7 @@ class GitHubArtifactRegistry {
         const prUrl = `https://api.github.com/repos/${this.repo}/pulls/${prNumber}`
         const prResponse = await fetch(prUrl, { headers })
         if (!prResponse.ok) {
-            throw new Error(`Pull request fetch error: ${prResponse.status}`)
+            throw new GitHubAPIError("PR fetch", prResponse)
         }
         const pr = await prResponse.json()
         const headSha = pr["head"]["sha"]
@@ -24,7 +34,7 @@ class GitHubArtifactRegistry {
         const runsUrl = `https://api.github.com/repos/${this.repo}/actions/runs?event=pull_request&head_sha=${headSha}`
         const runsResponse = await fetch(runsUrl, { headers })
         if (!runsResponse.ok) {
-            throw new Error(`Runs fetch error: ${runsResponse.status}`)
+            throw new GitHubAPIError("Runs fetch", runsResponse)
         }
         const runs = await runsResponse.json()
 
@@ -50,7 +60,7 @@ class GitHubArtifactRegistry {
         const runUrl = `https://api.github.com/repos/${this.repo}/actions/runs/${runId}`
         const runResponse = await fetch(runUrl, { headers })
         if (!runResponse.ok) {
-            throw new Error(`Metadata fetch error: ${runResponse.status}`)
+            throw new GitHubAPIError("Run fetch", runResponse)
         }
 
         const run = await runResponse.json()
@@ -99,17 +109,6 @@ function teeDownloadProgress(response: Response, setProgress: (bytes: number) =>
     }));
 }
 
-
-async function authenticate() {
-    const stored = localStorage.getItem("GITHUB_TOKEN");
-    if (stored == null || stored === "") {
-        const token = prompt("GitHub Personal Access Token")
-        if (token == null) {
-            throw new Error("No GitHub Personal Access Token")
-        }
-        localStorage.setItem("GITHUB_TOKEN", token)
-    }
-}
 
 async function initRubyWorkerClass(setStatus: (status: string) => void, setMetadata: (run: any) => void) {
     setStatus("Installing Ruby...")
@@ -280,8 +279,6 @@ async function init() {
         metadataElement.target = "_blank"
     }
 
-    setStatus("Authenticating...")
-    await authenticate()
     try {
         const makeRubyWorker = await initRubyWorkerClass(setStatus, setMetadata)
         if (makeRubyWorker == null) {
@@ -303,6 +300,11 @@ async function init() {
         })
     } catch (error) {
         setStatus(error.message)
+        if (error instanceof GitHubAPIError && error.isUnauthorized()) {
+            const configModal = document.getElementById("modal-config") as HTMLDialogElement
+            configModal.showModal()
+            return
+        }
     }
     console.log("init")
 }
