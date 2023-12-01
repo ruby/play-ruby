@@ -121,7 +121,7 @@ async function initRubyWorkerClass(setStatus: (status: string) => void, setMetad
         create(zipBuffer: ArrayBuffer, setStatus: (message: string) => void): Promise<RubyWorker>
     }
     const initFromGitHubActionsRun = async (runId: string) => {
-        const { run, artifact } = await artifactRegistry.getMetadata(actionsRunId!, "ruby-wasm-install")
+        const { run, artifact } = await artifactRegistry.getMetadata(runId, "ruby-wasm-install")
         setMetadata(run)
 
         setStatus("Downloading Ruby...")
