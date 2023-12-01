@@ -153,11 +153,13 @@ const consolePrinter = (log: (fd: number, str: string) => void) => {
 
 export class RubyWorker {
     module: WebAssembly.Module;
-    instnace: Promise<WebAssembly.Instance>;
-    wasi: WASI;
 
     constructor(module: WebAssembly.Module, private fs: WASIFs) {
         this.module = module
+    }
+
+    static async createFromModule(module: WebAssembly.Module): Promise<RubyWorker> {
+        return Comlink.proxy(new RubyWorker(module, new WASIFs()))
     }
 
     static async create(zipBuffer: ArrayBuffer, setStatus: (message: string) => void): Promise<RubyWorker> {

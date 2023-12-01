@@ -113,41 +113,54 @@ function teeDownloadProgress(response: Response, setProgress: (bytes: number) =>
 async function initRubyWorkerClass(setStatus: (status: string) => void, setMetadata: (run: any) => void) {
     setStatus("Installing Ruby...")
     const rubySource = rubySourceFromURL()
-    if (rubySource == null) {
-        setStatus("No ?run= or ?pr= query parameter")
-        return null;
-    }
-
     const artifactRegistry = new GitHubArtifactRegistry("ruby/ruby", await caches.open("ruby-wasm-install-v1"), {
         "Authorization": `token ${localStorage.getItem("GITHUB_TOKEN")}`
     })
-
-    let actionsRunId: string | null = null
-    if (rubySource.type === "github-actions-run") {
-        actionsRunId = rubySource.runId
-    } else if (rubySource.type === "github-pull-request") {
-        actionsRunId = await artifactRegistry.getPullRequestLatestRunId(rubySource.prNumber, ".github/workflows/wasm.yml")
-    }
-
-    const { run, artifact } = await artifactRegistry.getMetadata(actionsRunId!, "ruby-wasm-install")
-    setMetadata(run)
-
-    setStatus("Downloading Ruby...")
-    const zipResponse = teeDownloadProgress(
-        await artifactRegistry.get(artifact["archive_download_url"]),
-        (bytes) => {
-            const total = Number(artifact["size_in_bytes"])
-            const percent = Math.round(bytes / total * 100)
-            setStatus(`Downloading Ruby... ${percent}%`)
-        }
-    )
-    const zipBuffer = await zipResponse.arrayBuffer();
-
     const RubyWorkerClass = Comlink.wrap(new Worker("build/ruby.worker.js", { type: "module" })) as unknown as {
+        createFromModule(module: WebAssembly.Module): Promise<RubyWorker>;
         create(zipBuffer: ArrayBuffer, setStatus: (message: string) => void): Promise<RubyWorker>
     }
-    return async () => {
-        return await RubyWorkerClass.create(zipBuffer, Comlink.proxy(setStatus))
+    const initFromGitHubActionsRun = async (runId: string) => {
+        const { run, artifact } = await artifactRegistry.getMetadata(actionsRunId!, "ruby-wasm-install")
+        setMetadata(run)
+
+        setStatus("Downloading Ruby...")
+        const zipResponse = teeDownloadProgress(
+            await artifactRegistry.get(artifact["archive_download_url"]),
+            (bytes) => {
+                const total = Number(artifact["size_in_bytes"])
+                const percent = Math.round(bytes / total * 100)
+                setStatus(`Downloading Ruby... ${percent}%`)
+            }
+        )
+        const zipBuffer = await zipResponse.arrayBuffer();
+
+        return async () => {
+            return await RubyWorkerClass.create(zipBuffer, Comlink.proxy(setStatus))
+        }
+    }
+    const initFromBuiltin = async () => {
+        const rubyWasmBinary = fetch(`build/ruby.wasm`)
+        const rubyModule = (typeof WebAssembly.compileStreaming === "function") ?
+            WebAssembly.compileStreaming(rubyWasmBinary) :
+            WebAssembly.compile(await (await rubyWasmBinary).arrayBuffer())
+        return async () => {
+            const worker = await RubyWorkerClass.createFromModule(await rubyModule)
+            setStatus("Ready")
+            return worker
+        }
+    }
+
+    switch (rubySource.type) {
+        case "github-actions-run":
+            return initFromGitHubActionsRun(rubySource.runId)
+        case "github-pull-request":
+            const actionsRunId = await artifactRegistry.getPullRequestLatestRunId(rubySource.prNumber, ".github/workflows/wasm.yml")
+            return initFromGitHubActionsRun(actionsRunId)
+        case "builtin":
+            return initFromBuiltin()
+        default:
+            throw new Error(`Unknown Ruby source type: ${rubySource}`)
     }
 }
 
@@ -157,6 +170,8 @@ type RubySource = {
 } | {
     type: "github-pull-request",
     prNumber: string,
+} | {
+    type: "builtin"
 }
 
 function rubySourceFromURL(): RubySource | null {
@@ -168,7 +183,7 @@ function rubySourceFromURL(): RubySource | null {
             return { type: "github-pull-request", prNumber: value }
         }
     }
-    return null
+    return { type: "builtin" }
 }
 
 type UIState = {
