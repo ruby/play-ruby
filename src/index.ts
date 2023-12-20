@@ -137,9 +137,8 @@ function teeDownloadProgress(response: Response, setProgress: (bytes: number) =>
 }
 
 
-async function initRubyWorkerClass(setStatus: (status: string) => void, setMetadata: (run: any) => void) {
+async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: string) => void, setMetadata: (run: any) => void) {
     setStatus("Installing Ruby...")
-    const rubySource = rubySourceFromURL()
     const artifactRegistry = new GitHubArtifactRegistry("ruby/ruby", await caches.open("ruby-wasm-install-v1"), {
         "Authorization": `token ${localStorage.getItem("GITHUB_TOKEN")}`
     })
@@ -399,6 +398,7 @@ function initUI(state: UIState) {
 }
 
 async function init() {
+    const rubySource = rubySourceFromURL()
     const uiState = stateFromURL();
     initUI(uiState);
     const { editor, getOptions, getCode } = initEditor(uiState)
@@ -416,15 +416,45 @@ async function init() {
         document.getElementById("status").innerText = status
     }
     const setMetadata = (run: any) => {
-        const description = run["head_commit"]["message"].split("\n")[0]
-        const metadataElement = document.getElementById("metadata") as HTMLAnchorElement
-        metadataElement.innerText = run["head_commit"]["id"].slice(0, 7) + ": " + description
-        metadataElement.href = run["html_url"]
-        metadataElement.target = "_blank"
+        const metadataElement = document.getElementById("metadata") as HTMLSpanElement;
+        const linkElement = (link: string, text: string) => {
+            const a = document.createElement("a")
+            a.href = link
+            a.target = "_blank"
+            a.innerText = text
+            return a
+        }
+        const commitLink = () => {
+            const description = `Commit: ${run["head_commit"]["message"].split("\n")[0]} (${run["head_commit"]["id"].slice(0, 7)})`
+            const commitURL = `https://github.com/ruby/ruby/commit/${run["head_commit"]["id"]}`
+            return linkElement(commitURL, description)
+        }
+        switch (rubySource.type) {
+            case "github-actions-run": {
+                const runLink = linkElement(run["html_url"],  run["id"])
+                metadataElement.appendChild(document.createTextNode(`GitHub Actions run (`))
+                metadataElement.appendChild(runLink)
+                metadataElement.appendChild(document.createTextNode(`) `))
+                metadataElement.appendChild(commitLink())
+                break
+            }
+            case "github-pull-request": {
+                const prLink = linkElement(`https://github.com/ruby/ruby/pull/${rubySource.prNumber}`, `#${rubySource.prNumber}`)
+                const description = `GitHub PR (`;
+                metadataElement.appendChild(document.createTextNode(`GitHub PR (`))
+                metadataElement.appendChild(prLink)
+                metadataElement.appendChild(document.createTextNode(`) `))
+                metadataElement.appendChild(commitLink())
+                break
+            }
+            case "builtin":
+                const description = "Built-in Ruby"
+                break
+        }
     }
 
     try {
-        const makeRubyWorker = await initRubyWorkerClass(setStatus, setMetadata)
+        const makeRubyWorker = await initRubyWorkerClass(rubySource, setStatus, setMetadata)
         if (makeRubyWorker == null) {
             return
         }

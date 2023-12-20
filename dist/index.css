@@ -157,7 +157,7 @@ main {
     font-size: small;
 }
 
-.plrb-tools-metadata-revision {
+.plrb-tools-metadata-revision a {
     text-decoration-line: underline;
 }
 
