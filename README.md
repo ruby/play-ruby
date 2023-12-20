@@ -16,9 +16,9 @@ This is the source code for the Ruby Playground website.
 
 | URL | Description |
 | --- | --- |
-| https://ruby.github.io/play.ruby-lang.org | The latest version of Ruby |
-| https://ruby.github.io/play.ruby-lang.org/?pr=123 | Build of a GitHub Pull Request |
-| https://ruby.github.io/play.ruby-lang.org/?run=123 | Build of a GitHub Actions run |
+| https://ruby.github.io/play-ruby | The latest version of Ruby |
+| https://ruby.github.io/play-ruby/?pr=123 | Build of a GitHub Pull Request |
+| https://ruby.github.io/play-ruby/?run=123 | Build of a GitHub Actions run |
 
 ## Deployment
 
