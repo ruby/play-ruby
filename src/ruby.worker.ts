@@ -184,7 +184,7 @@ export class RubyWorker {
         }
 
         const wasi = new WASI(
-            ["ruby", "--disable=gems", "-e", code].concat(extraArgs),
+            ["ruby", "-e", code].concat(extraArgs),
             [],
             [
                 new OpenFile(new File([])), // stdin
