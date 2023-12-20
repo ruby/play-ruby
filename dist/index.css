@@ -44,6 +44,43 @@ main {
     margin: 0.5rem 0;
 }
 
+.plrb-editor-tabs {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.plrb-editor-tab-button {
+    border-top-left-radius: 0.25rem;
+    border-top-right-radius: 0.25rem;
+    border-width: 1px;
+    border-color: rgb(118, 118, 118);
+    background-color: #ffffff;
+    color: rgb(55 65 81);
+    font-size: 100%;
+    font-family: inherit;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    white-space: nowrap;
+    flex: 1 1 0%;
+}
+
+.plrb-editor-tab-button:hover {
+    background-color: #f2f2f2;
+    cursor: pointer;
+}
+
+.plrb-editor-tab-button-active {
+    background-color: var(--plrb-color-primary);
+    color: #ffffff;
+}
+
+.plrb-editor-tab-button-active:hover {
+    background-color: var(--plrb-color-primary-hover);
+}
+
 .plrb-editor-pane {
     flex: 1 1 0%;
 }

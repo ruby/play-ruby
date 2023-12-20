@@ -5,7 +5,11 @@ import fs from "node:fs"
 import https from "node:https"
 
 const buildOptions = {
-    entryPoints: ["src/index.ts", "src/ruby.worker.ts"],
+    entryPoints: [
+        "src/index.ts", "src/ruby.worker.ts",
+        "./node_modules/monaco-editor/esm/vs/editor/editor.worker.js",
+        "./node_modules/monaco-editor/esm/vs/language/json/json.worker.js",
+    ],
     bundle: true,
     format: "esm",
     outdir: "./dist/build",

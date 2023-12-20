@@ -116,7 +116,7 @@ async function initRubyWorkerClass(setStatus: (status: string) => void, setMetad
     const artifactRegistry = new GitHubArtifactRegistry("ruby/ruby", await caches.open("ruby-wasm-install-v1"), {
         "Authorization": `token ${localStorage.getItem("GITHUB_TOKEN")}`
     })
-    const RubyWorkerClass = Comlink.wrap(new Worker("build/ruby.worker.js", { type: "module" })) as unknown as {
+    const RubyWorkerClass = Comlink.wrap(new Worker("build/src/ruby.worker.js", { type: "module" })) as unknown as {
         createFromModule(module: WebAssembly.Module): Promise<RubyWorker>;
         create(zipBuffer: ArrayBuffer, setStatus: (message: string) => void): Promise<RubyWorker>
     }
@@ -186,15 +186,35 @@ function rubySourceFromURL(): RubySource | null {
     return { type: "builtin" }
 }
 
+type Options = {
+    arguments: string[],
+}
+
 type UIState = {
     code: string,
     action: string,
+    options: Options,
 }
+
+self.MonacoEnvironment = {
+	getWorkerUrl: function (moduleId, label) {
+		if (label === 'json') {
+			return './build/node_modules/monaco-editor/esm/vs/language/json/json.worker.js';
+		}
+		return './build/node_modules/monaco-editor/esm/vs/editor/editor.worker.js';
+	},
+    getWorker: function (moduleId, label) {
+        let workerUrl = self.MonacoEnvironment.getWorkerUrl(moduleId, label);
+        return new Worker(workerUrl, {
+            name: label,
+            type: 'module',
+        });
+    }
+};
+
 
 function initEditor(state: UIState) {
     const editor = monaco.editor.create(document.getElementById('editor'), {
-        value: ['def hello = puts "Hello"'].join('\n'),
-        language: "ruby",
         fontSize: 16,
     });
 
@@ -210,14 +230,80 @@ function initEditor(state: UIState) {
     }
     window.addEventListener("resize", layoutEditor)
 
-    editor.setValue(state.code)
-    editor.onDidChangeModelContent(() => {
-        const url = new URL(window.location.href)
-        url.searchParams.set("code", editor.getValue())
-        window.history.replaceState({}, "", url.toString())
-    })
+    const codeModel = monaco.editor.createModel(state.code, "ruby")
+    const optionsModel = monaco.editor.createModel(JSON.stringify(state.options, null, 2), "json")
+    editor.setModel(codeModel)
 
-    return editor;
+    type Tab = {
+        label: string,
+        model: monaco.editor.ITextModel,
+        active: boolean,
+        queryKey: string,
+    }
+    const tabs: Tab[] = [
+        {
+            label: "Code",
+            model: codeModel,
+            queryKey: "code",
+            active: true,
+        },
+        {
+            label: "Options",
+            model: optionsModel,
+            queryKey: "options",
+            active: false,
+        }
+    ]
+
+    for (const tab of tabs) {
+        tab.model.onDidChangeContent(() => {
+            const url = new URL(window.location.href)
+            let content = tab.model.getValue()
+            if (tab.model.getLanguageId() === "json") {
+                try {
+                    const minified = JSON.stringify(JSON.parse(tab.model.getValue()))
+                    content = minified
+                } catch (error) {
+                    // Ignore invalid JSON
+                    return;
+                }
+            }
+            url.searchParams.set(tab.queryKey, content);
+            window.history.replaceState({}, "", url.toString())
+        })
+    }
+
+    const editorTabs = document.getElementById("editor-tabs") as HTMLDivElement
+    for (const tab of tabs) {
+        const button = document.createElement("button")
+        button.classList.add("plrb-editor-tab-button");
+        if (tab.active) {
+            button.classList.add("plrb-editor-tab-button-active")
+        }
+        button.innerText = tab.label
+        button.addEventListener("click", () => {
+            editorTabs.querySelectorAll(".plrb-editor-tab-button").forEach((button) => {
+                button.classList.remove("plrb-editor-tab-button-active")
+            });
+            for (const tab of tabs) {
+                tab.active = false
+            }
+            tab.active = true
+            button.classList.add("plrb-editor-tab-button-active")
+            editor.setModel(tab.model)
+        });
+        editorTabs.appendChild(button)
+    }
+
+    return {
+        editor,
+        getOptions() {
+            return JSON.parse(optionsModel.getValue()) as Options
+        },
+        getCode() {
+            return codeModel.getValue()
+        }
+    };
 }
 
 function stateFromURL(): UIState {
@@ -235,7 +321,14 @@ puts RUBY_DESCRIPTION`
         action = "eval"
     }
 
-    return { code, action }
+    let options = JSON.parse(query.get("options")) as Options | null
+    if (options == null) {
+        options = {
+            arguments: [],
+        }
+    }
+
+    return { code, action, options }
 }
 
 function initUI(state: UIState) {
@@ -272,7 +365,7 @@ function initUI(state: UIState) {
 async function init() {
     const uiState = stateFromURL();
     initUI(uiState);
-    const editor = initEditor(uiState)
+    const { editor, getOptions, getCode } = initEditor(uiState)
     const buttonRun = document.getElementById("button-run")
     const outputPane = document.getElementById("output")
     const actionSelect = document.getElementById("action") as HTMLSelectElement
@@ -306,9 +399,16 @@ async function init() {
         const runCode = async (code: string) => {
             const selectedAction = actionSelect.value
             outputPane.innerText = ""
-            await worker.run(code, selectedAction, Comlink.proxy(writeOutput))
+            let args: string[] = []
+            try {
+                args = getOptions().arguments
+            } catch (error) {
+                writeOutput(`Error parsing options: ${error.message}\n`)
+                return;
+            }
+            await worker.run(code, selectedAction, args, Comlink.proxy(writeOutput))
         }
-        const run = async () => await runCode(editor.getValue());
+        const run = async () => await runCode(getCode());
 
         buttonRun.addEventListener("click", () => run())
         // Ctrl+Enter to run

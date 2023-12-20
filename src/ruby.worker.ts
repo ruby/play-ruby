@@ -174,12 +174,11 @@ export class RubyWorker {
         return Comlink.proxy(new RubyWorker(await rubyModule, fs))
     }
 
-    async run(code: string, action: string, log: (message: string) => void) {
-        let extraArgs: string[] = []
+    async run(code: string, action: string, extraArgs: string[], log: (message: string) => void) {
         switch (action) {
             case "eval": break
-            case "compile": extraArgs = ["--dump=insns"]; break
-            case "syntax": extraArgs = ["--dump=parsetree"]; break
+            case "compile": extraArgs.push("--dump=insns"); break
+            case "syntax": extraArgs.push("--dump=parsetree"); break
             default: throw new Error(`Unknown action: ${action}`)
         }
 
