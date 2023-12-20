@@ -313,6 +313,15 @@ async function init() {
         buttonRun.addEventListener("click", () => run())
         // Ctrl+Enter to run
         editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => run())
+
+        // If the action is not "eval", run the code every time it changes or the action changes
+        const runOnChange = () => {
+            if (actionSelect.value !== "eval") {
+                run()
+            }
+        }
+        editor.onDidChangeModelContent(() => runOnChange())
+        actionSelect.addEventListener("change", () => runOnChange())
     } catch (error) {
         setStatus(error.message)
         if (error instanceof GitHubAPIError && error.isUnauthorized()) {
