@@ -192,6 +192,30 @@ main {
     width: 90%;
 }
 
+/* Keyboard shortcut table */
+.plrb-shortcut-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.plrb-shortcut-table th {
+    text-align: left;
+    padding: 0.5rem;
+}
+
+.plrb-shortcut-table td {
+    padding: 0.5rem;
+}
+
+.plrb-shortcut-table tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+.plrb-shortcut-table th {
+    background-color: #4e555b;
+    color: white;
+}
+
 @media screen and (max-width: 768px) {
     .plrb-editor-pane {
         height: 50vh;

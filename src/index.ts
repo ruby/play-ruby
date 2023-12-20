@@ -303,16 +303,16 @@ async function init() {
         const writeOutput = (message: string) => {
             outputPane.innerText += message
         }
-        const run = async (code: string) => {
+        const runCode = async (code: string) => {
             const selectedAction = actionSelect.value
             outputPane.innerText = ""
             await worker.run(code, selectedAction, Comlink.proxy(writeOutput))
         }
+        const run = async () => await runCode(editor.getValue());
 
-        buttonRun.addEventListener("click", () => {
-            const text = editor.getValue()
-            run(text)
-        })
+        buttonRun.addEventListener("click", () => run())
+        // Ctrl+Enter to run
+        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => run())
     } catch (error) {
         setStatus(error.message)
         if (error instanceof GitHubAPIError && error.isUnauthorized()) {
