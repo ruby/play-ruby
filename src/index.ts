@@ -18,25 +18,25 @@ class GitHubAPIError extends Error {
 class GitHubArtifactRegistry {
     constructor(private repo: string, private cache: Cache, private headers: HeadersInit) { }
 
-    async getPullRequestLatestRunId(prNumber: string, workflowPath: string) {
+    private async jsonRequest(url: string, context: string) {
         const headers = {
             "Accept": "application/vnd.github.v3+json",
             ...this.headers,
         }
-        const prUrl = `https://api.github.com/repos/${this.repo}/pulls/${prNumber}`
-        const prResponse = await fetch(prUrl, { headers })
-        if (!prResponse.ok) {
-            throw new GitHubAPIError("PR fetch", prResponse)
+        const response = await fetch(url, { headers })
+        if (!response.ok) {
+            throw new GitHubAPIError(context, response)
         }
-        const pr = await prResponse.json()
+        return await response.json()
+    }
+
+    async getPullRequestLatestRunId(prNumber: string, workflowPath: string) {
+        const prUrl = `https://api.github.com/repos/${this.repo}/pulls/${prNumber}`
+        const pr = await this.jsonRequest(prUrl, "PR fetch")
         const headSha = pr["head"]["sha"]
 
         const runsUrl = `https://api.github.com/repos/${this.repo}/actions/runs?event=pull_request&head_sha=${headSha}`
-        const runsResponse = await fetch(runsUrl, { headers })
-        if (!runsResponse.ok) {
-            throw new GitHubAPIError("Runs fetch", runsResponse)
-        }
-        const runs = await runsResponse.json()
+        const runs = await this.jsonRequest(runsUrl, "Runs fetch")
 
         for (const run of runs["workflow_runs"]) {
             if (run["path"] === workflowPath) {
@@ -46,6 +46,43 @@ class GitHubArtifactRegistry {
         throw new Error(`No run for ${workflowPath} in PR ${prNumber}`)
     }
 
+    async getBranchLatestRunId(branch: string, workflowPath: string) {
+        async function *commits() {
+            let page = 1
+            while (true) {
+                const commitsUrl = `https://api.github.com/repos/${this.repo}/commits?sha=${branch}&page=${page}`
+                const commits = await this.jsonRequest(commitsUrl, "Commits fetch")
+                for (const commit of commits) {
+                    yield commit
+                }
+                if (commits.length === 0) {
+                    break
+                }
+                page++
+            }
+        }
+
+        for await (const commit of commits.call(this)) {
+            const runsUrl = `https://api.github.com/repos/${this.repo}/actions/runs?event=push&branch=${branch}&commit_sha=${commit["sha"]}&status=success&exclude_pull_requests=true`
+            let runs: any;
+            try {
+                runs = await this.jsonRequest(runsUrl, "Runs fetch")
+            } catch (error) {
+                if (error instanceof GitHubAPIError && error.response.status === 404) {
+                    // No runs for this commit
+                    continue
+                }
+                throw error
+            }
+
+            for (const run of runs["workflow_runs"]) {
+                if (run["path"] === workflowPath) {
+                    return run["id"]
+                }
+            }
+        }
+    }
+
     /**
      * Fetches the metadata for a GitHub Actions run and returns the metadata for the given artifact
      * @param runId The ID of the GitHub Actions run
@@ -53,19 +90,9 @@ class GitHubArtifactRegistry {
      * @returns The metadata for the artifact in the given run
      */
     async getMetadata(runId: string, artifactName: string) {
-        const headers = {
-            "Accept": "application/vnd.github.v3+json",
-            ...this.headers,
-        }
         const runUrl = `https://api.github.com/repos/${this.repo}/actions/runs/${runId}`
-        const runResponse = await fetch(runUrl, { headers })
-        if (!runResponse.ok) {
-            throw new GitHubAPIError("Run fetch", runResponse)
-        }
-
-        const run = await runResponse.json()
-        const artifactsResponse = await fetch(run["artifacts_url"], { headers })
-        const artifacts = await artifactsResponse.json()
+        const run = await this.jsonRequest(runUrl, "Run fetch")
+        const artifacts = await this.jsonRequest(run["artifacts_url"], "Artifacts fetch")
 
         const artifact = artifacts["artifacts"].find((artifact: any) => artifact["name"] === artifactName)
         if (artifact == null) {
@@ -151,11 +178,16 @@ async function initRubyWorkerClass(setStatus: (status: string) => void, setMetad
         }
     }
 
+    const workflowPath = ".github/workflows/wasm.yml"
     switch (rubySource.type) {
         case "github-actions-run":
-            return initFromGitHubActionsRun(rubySource.runId)
+            let runId = rubySource.runId
+            if (rubySource.runId === "latest") {
+                runId = await artifactRegistry.getBranchLatestRunId("master", workflowPath)
+            }
+            return initFromGitHubActionsRun(runId)
         case "github-pull-request":
-            const actionsRunId = await artifactRegistry.getPullRequestLatestRunId(rubySource.prNumber, ".github/workflows/wasm.yml")
+            const actionsRunId = await artifactRegistry.getPullRequestLatestRunId(rubySource.prNumber, workflowPath)
             return initFromGitHubActionsRun(actionsRunId)
         case "builtin":
             return initFromBuiltin()
@@ -181,9 +213,13 @@ function rubySourceFromURL(): RubySource | null {
             return { type: "github-actions-run", runId: value }
         } else if (key === "pr") {
             return { type: "github-pull-request", prNumber: value }
+        } else if (key === "latest") {
+            return { type: "github-actions-run", runId: "latest" }
+        } else if (key === "builtin") {
+            return { type: "builtin" }
         }
     }
-    return { type: "builtin" }
+    return { type: "github-actions-run", runId: "latest" }
 }
 
 type Options = {
@@ -380,7 +416,7 @@ async function init() {
         document.getElementById("status").innerText = status
     }
     const setMetadata = (run: any) => {
-        const description = `${run["head_commit"]["message"]}`
+        const description = run["head_commit"]["message"].split("\n")[0]
         const metadataElement = document.getElementById("metadata") as HTMLAnchorElement
         metadataElement.innerText = run["head_commit"]["id"].slice(0, 7) + ": " + description
         metadataElement.href = run["html_url"]
