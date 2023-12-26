@@ -143,18 +143,14 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
         "Authorization": `token ${localStorage.getItem("GITHUB_TOKEN")}`
     })
     const RubyWorkerClass = Comlink.wrap(new Worker("build/src/ruby.worker.js", { type: "module" })) as unknown as {
-        createFromModule(module: WebAssembly.Module): Promise<RubyWorker>;
-        create(zipBuffer: ArrayBuffer, setStatus: (message: string) => void): Promise<RubyWorker>
+        create(zipBuffer: ArrayBuffer, prefix: string | null, setStatus: (message: string) => void): Promise<RubyWorker>
     }
-    const initFromGitHubActionsRun = async (runId: string) => {
-        const { run, artifact } = await artifactRegistry.getMetadata(runId, "ruby-wasm-install")
-        setMetadata(run)
-
+    const initFromZipTarball = async (url: string, size: number, prefix: string | null) => {
         setStatus("Downloading Ruby...")
         const zipResponse = teeDownloadProgress(
-            await artifactRegistry.get(artifact["archive_download_url"]),
+            await artifactRegistry.get(url),
             (bytes) => {
-                const total = Number(artifact["size_in_bytes"])
+                const total = size
                 const percent = Math.round(bytes / total * 100)
                 setStatus(`Downloading Ruby... ${percent}%`)
             }
@@ -162,19 +158,17 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
         const zipBuffer = await zipResponse.arrayBuffer();
 
         return async () => {
-            return await RubyWorkerClass.create(zipBuffer, Comlink.proxy(setStatus))
+            return await RubyWorkerClass.create(zipBuffer, prefix, Comlink.proxy(setStatus))
         }
     }
-    const initFromBuiltin = async () => {
-        const rubyWasmBinary = fetch(`build/ruby.wasm`)
-        const rubyModule = (typeof WebAssembly.compileStreaming === "function") ?
-            WebAssembly.compileStreaming(rubyWasmBinary) :
-            WebAssembly.compile(await (await rubyWasmBinary).arrayBuffer())
-        return async () => {
-            const worker = await RubyWorkerClass.createFromModule(await rubyModule)
-            setStatus("Ready")
-            return worker
-        }
+    const initFromGitHubActionsRun = async (runId: string) => {
+        const { run, artifact } = await artifactRegistry.getMetadata(runId, "ruby-wasm-install")
+        setMetadata(run)
+        return await initFromZipTarball(artifact["archive_download_url"], Number(artifact["size_in_bytes"]), null)
+    }
+    const initFromBuiltin = async (version: string) => {
+        const url = `/build/ruby-${version}.zip`
+        return await initFromZipTarball(url, 0, `${version}-wasm32-unknown-wasi-full`)
     }
 
     const workflowPath = ".github/workflows/wasm.yml"
@@ -189,7 +183,7 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
             const actionsRunId = await artifactRegistry.getPullRequestLatestRunId(rubySource.prNumber, workflowPath)
             return initFromGitHubActionsRun(actionsRunId)
         case "builtin":
-            return initFromBuiltin()
+            return initFromBuiltin(rubySource.version)
         default:
             throw new Error(`Unknown Ruby source type: ${rubySource}`)
     }
@@ -202,7 +196,8 @@ type RubySource = {
     type: "github-pull-request",
     prNumber: string,
 } | {
-    type: "builtin"
+    type: "builtin",
+    version: string,
 }
 
 function rubySourceFromURL(): RubySource | null {
@@ -215,10 +210,10 @@ function rubySourceFromURL(): RubySource | null {
         } else if (key === "latest") {
             return { type: "github-actions-run", runId: "latest" }
         } else if (key === "builtin") {
-            return { type: "builtin" }
+            return { type: "builtin", version: value }
         }
     }
-    return { type: "github-actions-run", runId: "latest" }
+    return { type: "builtin", version: "3.3" }
 }
 
 type Options = {
@@ -440,7 +435,6 @@ async function init() {
             }
             case "github-pull-request": {
                 const prLink = linkElement(`https://github.com/ruby/ruby/pull/${rubySource.prNumber}`, `#${rubySource.prNumber}`)
-                const description = `GitHub PR (`;
                 metadataElement.appendChild(document.createTextNode(`GitHub PR (`))
                 metadataElement.appendChild(prLink)
                 metadataElement.appendChild(document.createTextNode(`) `))

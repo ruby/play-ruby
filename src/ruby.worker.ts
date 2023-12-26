@@ -88,6 +88,9 @@ class WASIFs implements IFs {
         const parts = this._splitPath(path)
         const dir = this._getDirectoryAtPath(parts.slice(0, parts.length - 1))
         const file = dir.get_entry_for_path(parts[parts.length - 1]) as File
+        if (file == null) {
+            throw new Error(`ENOENT: no such file or directory, open '${path}'`)
+        }
         return file.data
     }
 }
@@ -154,24 +157,20 @@ const consolePrinter = (log: (fd: number, str: string) => void) => {
 export class RubyWorker {
     module: WebAssembly.Module;
 
-    constructor(module: WebAssembly.Module, private fs: WASIFs) {
+    constructor(module: WebAssembly.Module, private prefix: string | null, private fs: WASIFs) {
         this.module = module
     }
 
-    static async createFromModule(module: WebAssembly.Module): Promise<RubyWorker> {
-        return Comlink.proxy(new RubyWorker(module, new WASIFs()))
-    }
-
-    static async create(zipBuffer: ArrayBuffer, setStatus: (message: string) => void): Promise<RubyWorker> {
+    static async create(zipBuffer: ArrayBuffer, prefix: string | null, setStatus: (message: string) => void): Promise<RubyWorker> {
         setStatus("Loading...")
         const fs = new WASIFs()
         const installer = new RubyInstall(setStatus)
         await installer.installZip(fs, new Response(zipBuffer))
-        const rubyModuleEntry = fs.readFileSync("/usr/local/bin/ruby")
+        const rubyModuleEntry = fs.readFileSync(prefix + "/usr/local/bin/ruby")
         const rubyModule = WebAssembly.compile(rubyModuleEntry as Uint8Array)
         setStatus("Ready")
 
-        return Comlink.proxy(new RubyWorker(await rubyModule, fs))
+        return Comlink.proxy(new RubyWorker(await rubyModule, prefix, fs))
     }
 
     async run(code: string, action: string, extraArgs: string[], log: (message: string) => void) {
@@ -179,7 +178,13 @@ export class RubyWorker {
             case "eval": break
             case "compile": extraArgs.push("--dump=insns"); break
             case "syntax": extraArgs.push("--dump=parsetree"); break
+            case "syntax+prism": extraArgs.push("--dump=prism_parsetree"); break
             default: throw new Error(`Unknown action: ${action}`)
+        }
+
+        let rootContents = this.fs.rootContents
+        if (this.prefix != null) {
+            rootContents = (this.fs.rootContents[this.prefix] as Directory).contents
         }
 
         const wasi = new WASI(
@@ -189,7 +194,7 @@ export class RubyWorker {
                 new OpenFile(new File([])), // stdin
                 new OpenFile(new File([])), // stdout
                 new OpenFile(new File([])), // stderr
-                new PreopenDirectory("/", this.fs.rootContents),
+                new PreopenDirectory("/", rootContents),
             ],
             {
                 debug: false

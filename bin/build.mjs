@@ -24,13 +24,12 @@ const buildOptions = {
     ]
 }
 
-async function downloadBuiltinRuby(version) {
-    const url = `https://github.com/ruby/ruby.wasm/releases/download/${version}/ruby.wasm`
-    const destination = `./dist/build/ruby.wasm`
-    if (fs.existsSync(destination)) {
-        return
-    }
-    fs.mkdirSync("./dist/build", { recursive: true })
+async function downloadBuiltinRuby(version, rubyVersion) {
+    const tarball = `ruby-${rubyVersion}-wasm32-unknown-wasi-full.tar.gz`
+    const url = `https://github.com/ruby/ruby.wasm/releases/download/${version}/${tarball}`
+    const destination = `./dist/build/ruby-${rubyVersion}/install.tar.gz`
+    const zipDest = `./dist/build/ruby-${rubyVersion}.zip`
+    fs.mkdirSync(`./dist/build/ruby-${rubyVersion}`, { recursive: true })
 
     async function downloadUrl(url, destination) {
         const response = await new Promise((resolve, reject) => {
@@ -49,11 +48,23 @@ async function downloadBuiltinRuby(version) {
             file.on("error", reject)
         })
     }
-    console.log(`Downloading ${url} to ${destination}`)
-    await downloadUrl(url, destination)
+    if (!fs.existsSync(destination)) {
+        console.log(`Downloading ${url} to ${destination}`)
+        await downloadUrl(url, destination)
+    }
+
+    if (!fs.existsSync(zipDest)) {
+        console.log(`Zipping ${destination} to ${zipDest}`)
+        await new Promise((resolve, reject) => {
+            const zip = spawn("zip", ["-j", zipDest, destination])
+            zip.on("exit", resolve)
+            zip.on("error", reject)
+        })
+    }
 }
 
-await downloadBuiltinRuby("2.3.0")
+await downloadBuiltinRuby("2.4.1", "3.2")
+await downloadBuiltinRuby("2.4.1", "3.3")
 
 const action = process.argv[2] ?? "build"
 switch (action) {
