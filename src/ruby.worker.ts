@@ -166,7 +166,7 @@ export class RubyWorker {
         const fs = new WASIFs()
         const installer = new RubyInstall(setStatus)
         await installer.installZip(fs, new Response(zipBuffer))
-        const rubyModuleEntry = fs.readFileSync(prefix + "/usr/local/bin/ruby")
+        const rubyModuleEntry = fs.readFileSync((prefix || "") + "/usr/local/bin/ruby")
         const rubyModule = WebAssembly.compile(rubyModuleEntry as Uint8Array)
         setStatus("Ready")
 

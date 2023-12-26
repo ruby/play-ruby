@@ -47,7 +47,7 @@ class GitHubArtifactRegistry {
     }
 
     async getBranchLatestRunId(branch: string, workflowPath: string) {
-        async function *commits() {
+        async function* commits() {
             let page = 1
             while (true) {
                 const commitsUrl = `https://api.github.com/repos/${this.repo}/commits?sha=${branch}&page=${page}`
@@ -119,7 +119,7 @@ class GitHubArtifactRegistry {
 /**
  * Passes through a response, but also calls setProgress with the number of bytes downloaded
  */
-function teeDownloadProgress(response: Response, setProgress: (bytes: number) => void): Response {
+function teeDownloadProgress(response: Response, setProgress: (bytes: number, response: Response) => void): Response {
     let loaded = 0
     return new Response(new ReadableStream({
         async start(controller) {
@@ -128,7 +128,7 @@ function teeDownloadProgress(response: Response, setProgress: (bytes: number) =>
                 const { done, value } = await reader.read();
                 if (done) break;
                 loaded += value.byteLength;
-                setProgress(loaded);
+                setProgress(loaded, response);
                 controller.enqueue(value);
             }
             controller.close();
@@ -145,15 +145,14 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
     const RubyWorkerClass = Comlink.wrap(new Worker("build/src/ruby.worker.js", { type: "module" })) as unknown as {
         create(zipBuffer: ArrayBuffer, prefix: string | null, setStatus: (message: string) => void): Promise<RubyWorker>
     }
-    const initFromZipTarball = async (url: string, size: number, prefix: string | null) => {
+    const initFromZipTarball = async (
+        url: string, prefix: string | null,
+        setProgress: (bytes: number, response: Response) => void
+    ) => {
         setStatus("Downloading Ruby...")
         const zipResponse = teeDownloadProgress(
             await artifactRegistry.get(url),
-            (bytes) => {
-                const total = size
-                const percent = Math.round(bytes / total * 100)
-                setStatus(`Downloading Ruby... ${percent}%`)
-            }
+            setProgress
         )
         const zipBuffer = await zipResponse.arrayBuffer();
 
@@ -164,11 +163,20 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
     const initFromGitHubActionsRun = async (runId: string) => {
         const { run, artifact } = await artifactRegistry.getMetadata(runId, "ruby-wasm-install")
         setMetadata(run)
-        return await initFromZipTarball(artifact["archive_download_url"], Number(artifact["size_in_bytes"]), null)
+        const size = Number(artifact["size_in_bytes"]);
+        return await initFromZipTarball(artifact["archive_download_url"], null, (bytes, _) => {
+            const total = size
+            const percent = Math.round(bytes / total * 100)
+            setStatus(`Downloading Ruby... ${percent}%`)
+        })
     }
     const initFromBuiltin = async (version: string) => {
         const url = `build/ruby-${version}.zip`
-        return await initFromZipTarball(url, 0, `${version}-wasm32-unknown-wasi-full`)
+        return await initFromZipTarball(url, `${version}-wasm32-unknown-wasi-full`, (bytes, response) => {
+            const total = Number(response.headers.get("Content-Length"))
+            const percent = Math.round(bytes / total * 100)
+            setStatus(`Downloading Ruby... ${percent}%`)
+        })
     }
 
     const workflowPath = ".github/workflows/wasm.yml"
@@ -227,12 +235,12 @@ type UIState = {
 }
 
 self.MonacoEnvironment = {
-	getWorkerUrl: function (moduleId, label) {
-		if (label === 'json') {
-			return './build/node_modules/monaco-editor/esm/vs/language/json/json.worker.js';
-		}
-		return './build/node_modules/monaco-editor/esm/vs/editor/editor.worker.js';
-	},
+    getWorkerUrl: function (moduleId, label) {
+        if (label === 'json') {
+            return './build/node_modules/monaco-editor/esm/vs/language/json/json.worker.js';
+        }
+        return './build/node_modules/monaco-editor/esm/vs/editor/editor.worker.js';
+    },
     getWorker: function (moduleId, label) {
         let workerUrl = self.MonacoEnvironment.getWorkerUrl(moduleId, label);
         return new Worker(workerUrl, {
@@ -426,7 +434,7 @@ async function init() {
         }
         switch (rubySource.type) {
             case "github-actions-run": {
-                const runLink = linkElement(run["html_url"],  run["id"])
+                const runLink = linkElement(run["html_url"], run["id"])
                 metadataElement.appendChild(document.createTextNode(`GitHub Actions run (`))
                 metadataElement.appendChild(runLink)
                 metadataElement.appendChild(document.createTextNode(`) `))
