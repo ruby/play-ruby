@@ -167,7 +167,7 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
         return await initFromZipTarball(artifact["archive_download_url"], Number(artifact["size_in_bytes"]), null)
     }
     const initFromBuiltin = async (version: string) => {
-        const url = `/build/ruby-${version}.zip`
+        const url = `build/ruby-${version}.zip`
         return await initFromZipTarball(url, 0, `${version}-wasm32-unknown-wasi-full`)
     }
 
