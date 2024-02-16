@@ -4,7 +4,7 @@
     "serve": "node ./bin/build.mjs dev"
   },
   "dependencies": {
-    "@bjorn3/browser_wasi_shim": "^0.2.17",
+    "@bjorn3/browser_wasi_shim": "^0.2.19",
     "@zip.js/zip.js": "^2.7.34",
     "comlink": "^4.4.1",
     "esbuild-plugin-polyfill-node": "^0.3.0",
