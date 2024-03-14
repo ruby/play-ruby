@@ -133,8 +133,8 @@ export class RubyWorker {
             [],
             [
                 new OpenFile(new File([])), // stdin
-                ConsoleStdout.lineBuffered(log), // stdout
-                ConsoleStdout.lineBuffered(log), // stderr
+                ConsoleStdout.lineBuffered((line) => log(line + "\n")), // stdout
+                ConsoleStdout.lineBuffered((line) => log(line + "\n")), // stderr
                 new PreopenDirectory("/", rootContents),
             ],
             {
