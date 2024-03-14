@@ -4,11 +4,11 @@
     "serve": "node ./bin/build.mjs dev"
   },
   "dependencies": {
-    "@bjorn3/browser_wasi_shim": "^0.2.19",
-    "@zip.js/zip.js": "^2.7.36",
+    "@bjorn3/browser_wasi_shim": "^0.2.20",
+    "@zip.js/zip.js": "^2.7.40",
     "comlink": "^4.4.1",
     "esbuild-plugin-polyfill-node": "^0.3.0",
-    "monaco-editor": "^0.46.0",
+    "monaco-editor": "^0.47.0",
     "tar-stream": "^3.1.7"
   },
   "devDependencies": {
