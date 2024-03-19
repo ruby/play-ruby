@@ -1,4 +1,4 @@
-import { Directory, File, OpenFile, PreopenDirectory, SyncOPFSFile, ConsoleStdout, WASI } from "@bjorn3/browser_wasi_shim"
+import { Directory, File, OpenFile, PreopenDirectory, SyncOPFSFile, WASI } from "@bjorn3/browser_wasi_shim"
 import * as Comlink from "comlink"
 import { IFs, RubyInstall } from "./ruby-install"
 
@@ -95,6 +95,65 @@ class WASIFs implements IFs {
     }
 }
 
+const consolePrinter = (log: (fd: number, str: string) => void) => {
+    let memory: WebAssembly.Memory | undefined = undefined;
+    let view: DataView | undefined = undefined;
+
+    const decoder = new TextDecoder();
+
+    return {
+        addToImports(imports: WebAssembly.Imports): void {
+            const original = imports.wasi_snapshot_preview1.fd_write as (
+                fd: number,
+                iovs: number,
+                iovsLen: number,
+                nwritten: number,
+            ) => number;
+            imports.wasi_snapshot_preview1.fd_write = (
+                fd: number,
+                iovs: number,
+                iovsLen: number,
+                nwritten: number,
+            ): number => {
+                if (fd !== 1 && fd !== 2) {
+                    return original(fd, iovs, iovsLen, nwritten);
+                }
+
+                if (typeof memory === "undefined" || typeof view === "undefined") {
+                    throw new Error("Memory is not set");
+                }
+                if (view.buffer.byteLength === 0) {
+                    view = new DataView(memory.buffer);
+                }
+
+                const buffers = Array.from({ length: iovsLen }, (_, i) => {
+                    const ptr = iovs + i * 8;
+                    const buf = view.getUint32(ptr, true);
+                    const bufLen = view.getUint32(ptr + 4, true);
+                    return new Uint8Array(memory.buffer, buf, bufLen);
+                });
+
+                let written = 0;
+                let str = "";
+                for (const buffer of buffers) {
+                    str += decoder.decode(buffer);
+                    written += buffer.byteLength;
+                }
+                view.setUint32(nwritten, written, true);
+
+                log(fd, str);
+
+                return 0;
+            };
+        },
+        setMemory(m: WebAssembly.Memory) {
+            memory = m;
+            view = new DataView(m.buffer);
+        },
+    };
+};
+
+
 export class RubyWorker {
     module: WebAssembly.Module;
 
@@ -133,8 +192,8 @@ export class RubyWorker {
             [],
             [
                 new OpenFile(new File([])), // stdin
-                ConsoleStdout.lineBuffered(log), // stdout
-                ConsoleStdout.lineBuffered(log), // stderr
+                new OpenFile(new File([])), // stdout
+                new OpenFile(new File([])), // stderr
                 new PreopenDirectory("/", rootContents),
             ],
             {
@@ -144,8 +203,11 @@ export class RubyWorker {
         const imports = {
             wasi_snapshot_preview1: wasi.wasiImport,
         }
+        const printer = consolePrinter((fd, str) => { log(str) })
+        printer.addToImports(imports)
 
         const instnace: any = await WebAssembly.instantiate(this.module, imports);
+        printer.setMemory(instnace.exports.memory);
         try {
             wasi.start(instnace)
         } catch (e) {
