@@ -519,7 +519,8 @@ async function init() {
             const [files, remaining] = splitFile(code)
             const codeMap = { [mainFile]: remaining }
             for (const [filename, file] of Object.entries(files)) {
-                codeMap[filename] = file.content
+                // Prepend empty lines to the file content to match the original source line
+                codeMap[filename] = "\n".repeat(file.sourceLine + 1) + file.content
             }
             console.log(codeMap)
             await worker.run(codeMap, mainFile, selectedAction, args, Comlink.proxy(writeOutput))
