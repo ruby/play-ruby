@@ -52,6 +52,13 @@ class WASIFs implements IFs {
         return parts.filter((part) => part !== "" && part !== ".")
     }
 
+    /// This is a shallow clone, so the contents of directories under the root are not cloned
+    shallowClone(): WASIFs {
+        const fs = new WASIFs()
+        fs.rootContents = { ...this.rootContents }
+        return fs
+    }
+
     mkdirSync(path: string, options?: any): void {
         const parts = this._splitPath(path)
         const recursive = options?.recursive ?? false
@@ -173,7 +180,7 @@ export class RubyWorker {
         return Comlink.proxy(new RubyWorker(await rubyModule, fs))
     }
 
-    async run(code: string, action: string, extraArgs: string[], log: (message: string) => void) {
+    async run(code: { [path: string]: string }, mainScriptPath: string, action: string, extraArgs: string[], log: (message: string) => void) {
         switch (action) {
             case "eval": break
             case "compile": extraArgs.push("--dump=insns"); break
@@ -182,10 +189,17 @@ export class RubyWorker {
             default: throw new Error(`Unknown action: ${action}`)
         }
 
-        let rootContents = this.fs.rootContents
+        // Build a fresh file system by merging given code files and the Ruby installation
+        const codeFs = this.fs.shallowClone()
+        const textEncoder = new TextEncoder()
+        for (const path in code) {
+            codeFs.writeFileSync(path, textEncoder.encode(code[path]))
+        }
+        const rootContents = codeFs.rootContents
 
+        // Run the Ruby module with the given code
         const wasi = new WASI(
-            ["ruby", "-e", code].concat(extraArgs),
+            ["ruby"].concat(extraArgs).concat([mainScriptPath]),
             [],
             [
                 new OpenFile(new File([])), // stdin
@@ -209,6 +223,7 @@ export class RubyWorker {
             wasi.start(instnace)
         } catch (e) {
             log(e)
+            throw e
         }
     }
 }

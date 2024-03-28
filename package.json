@@ -1,7 +1,8 @@
 {
   "scripts": {
     "build": "node ./bin/build.mjs",
-    "serve": "node ./bin/build.mjs dev"
+    "serve": "node ./bin/build.mjs dev",
+    "test": "vitest"
   },
   "dependencies": {
     "@bjorn3/browser_wasi_shim": "^0.2.20",
@@ -13,6 +14,7 @@
   },
   "devDependencies": {
     "@types/tar-stream": "^3.1.3",
-    "esbuild": "^0.20.1"
+    "esbuild": "^0.20.1",
+    "vitest": "^1.4.0"
   }
 }

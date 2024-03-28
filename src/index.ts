@@ -1,6 +1,7 @@
 import * as monaco from "monaco-editor"
 import * as Comlink from "comlink"
 import type { RubyWorker } from "./ruby.worker"
+import { splitFile } from "./split-file"
 
 class GitHubAPIError extends Error {
     constructor(context: string, public response: Response) {
@@ -478,7 +479,14 @@ async function init() {
                 writeOutput(`Error parsing options: ${error.message}\n`)
                 return;
             }
-            await worker.run(code, selectedAction, args, Comlink.proxy(writeOutput))
+            const mainFile = "main.rb"
+            const [files, remaining] = splitFile(code)
+            const codeMap = { [mainFile]: remaining }
+            for (const [filename, file] of Object.entries(files)) {
+                codeMap[filename] = file.content
+            }
+            console.log(codeMap)
+            await worker.run(codeMap, mainFile, selectedAction, args, Comlink.proxy(writeOutput))
         }
         const run = async () => await runCode(getCode());
 
