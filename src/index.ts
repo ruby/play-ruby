@@ -275,13 +275,14 @@ function initEditor(state: UIState) {
 
     const codeModel = monaco.editor.createModel(state.code, "ruby")
     const optionsModel = monaco.editor.createModel(JSON.stringify(state.options, null, 2), "json")
-    editor.setModel(codeModel)
 
     type Tab = {
         label: string,
         model: monaco.editor.ITextModel,
         active: boolean,
         queryKey: string,
+        computeQueryValue: (value: string) => string | null,
+        applyDecorations?: (value: string) => void,
     }
     const tabs: Tab[] = [
         {
@@ -289,32 +290,68 @@ function initEditor(state: UIState) {
             model: codeModel,
             queryKey: "code",
             active: true,
+            computeQueryValue: (value) => value,
+            applyDecorations: (() => {
+                let lastDecorations: monaco.editor.IEditorDecorationsCollection | null = null
+                return (value) => {
+                    const [files, _] = splitFile(value)
+                    const decorations: monaco.editor.IModelDeltaDecoration[] = []
+                    for (const [filename, file] of Object.entries(files)) {
+                        const line = file.sourceLine;
+                        const range = new monaco.Range(line + 1, 1, line + 1, 1)
+                        decorations.push({
+                            range,
+                            options: {
+                                isWholeLine: true,
+                                className: "plrb-editor-file-header",
+                            }
+                        })
+                    }
+                    if (lastDecorations) lastDecorations.clear()
+                    lastDecorations = editor.createDecorationsCollection(decorations)
+                }
+            })()
         },
         {
             label: "Options",
             model: optionsModel,
             queryKey: "options",
             active: false,
+            computeQueryValue: (value) => {
+                try {
+                    const minified = JSON.stringify(JSON.parse(value))
+                    return minified
+                } catch (error) {
+                    // Ignore invalid JSON
+                    return null;
+                }
+            },
         }
     ]
 
     for (const tab of tabs) {
-        tab.model.onDidChangeContent(() => {
+        const updateURL = () => {
             const url = new URL(window.location.href)
-            let content = tab.model.getValue()
-            if (tab.model.getLanguageId() === "json") {
-                try {
-                    const minified = JSON.stringify(JSON.parse(tab.model.getValue()))
-                    content = minified
-                } catch (error) {
-                    // Ignore invalid JSON
-                    return;
-                }
-            }
+            let content = tab.computeQueryValue(tab.model.getValue())
             url.searchParams.set(tab.queryKey, content);
             window.history.replaceState({}, "", url.toString())
+        }
+        tab.model.onDidChangeContent(() => {
+            updateURL()
+            if (tab.applyDecorations) {
+                tab.applyDecorations(tab.model.getValue())
+            }
         })
     }
+
+    const setTab = (tab: Tab) => {
+        tab.active = true
+        editor.setModel(tab.model)
+        if (tab.applyDecorations) {
+            tab.applyDecorations(tab.model.getValue())
+        }
+    }
+    setTab(tabs[0]) // Set the first tab as active
 
     const editorTabs = document.getElementById("editor-tabs") as HTMLDivElement
     for (const tab of tabs) {
@@ -331,9 +368,8 @@ function initEditor(state: UIState) {
             for (const tab of tabs) {
                 tab.active = false
             }
-            tab.active = true
             button.classList.add("plrb-editor-tab-button-active")
-            editor.setModel(tab.model)
+            setTab(tab)
         });
         editorTabs.appendChild(button)
     }

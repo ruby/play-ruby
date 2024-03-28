@@ -85,6 +85,10 @@ main {
     flex: 1 1 0%;
 }
 
+.plrb-editor-file-header {
+    background: rgba(173, 216, 230, 0.5);
+}
+
 .plrb-tools-output-group {
     display: flex;
     flex-direction: column;
