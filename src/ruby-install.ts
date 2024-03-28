@@ -7,7 +7,13 @@ export type IFs = {
 }
 
 export class RubyInstall {
-    constructor(private setStatus: (status: string) => void = () => { }) { }
+    private stripComponents: number
+    private setStatus: ((status: string) => void)
+
+    constructor(options: { stripComponents: number | null, setStatus: ((status: string) => void) | null }) {
+        this.stripComponents = options.stripComponents ?? 0
+        this.setStatus = options.setStatus ?? (() => { })
+    }
 
     async installZip(fs: IFs, zipResponse: Response) {
         const zipReader = new ZipReader(zipResponse.body);
@@ -39,7 +45,12 @@ export class RubyInstall {
         const dataWorks = []
         for await (const entry of tarExtract) {
             const header = entry.header;
-            const path = header.name
+            let path = header.name
+            if (this.stripComponents > 0) {
+                const parts = path.split("/")
+                path = parts.slice(this.stripComponents).join("/")
+            }
+
             if (header.type === "directory") {
                 fs.mkdirSync(path, { recursive: true })
             } else if (header.type === "file") {

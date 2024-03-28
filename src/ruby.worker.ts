@@ -157,20 +157,20 @@ const consolePrinter = (log: (fd: number, str: string) => void) => {
 export class RubyWorker {
     module: WebAssembly.Module;
 
-    constructor(module: WebAssembly.Module, private prefix: string | null, private fs: WASIFs) {
+    constructor(module: WebAssembly.Module, private fs: WASIFs) {
         this.module = module
     }
 
-    static async create(zipBuffer: ArrayBuffer, prefix: string | null, setStatus: (message: string) => void): Promise<RubyWorker> {
+    static async create(zipBuffer: ArrayBuffer, stripComponents: number, setStatus: (message: string) => void): Promise<RubyWorker> {
         setStatus("Loading...")
         const fs = new WASIFs()
-        const installer = new RubyInstall(setStatus)
+        const installer = new RubyInstall({ stripComponents, setStatus })
         await installer.installZip(fs, new Response(zipBuffer))
-        const rubyModuleEntry = fs.readFileSync((prefix || "") + "/usr/local/bin/ruby")
+        const rubyModuleEntry = fs.readFileSync("/usr/local/bin/ruby")
         const rubyModule = WebAssembly.compile(rubyModuleEntry as Uint8Array)
         setStatus("Ready")
 
-        return Comlink.proxy(new RubyWorker(await rubyModule, prefix, fs))
+        return Comlink.proxy(new RubyWorker(await rubyModule, fs))
     }
 
     async run(code: string, action: string, extraArgs: string[], log: (message: string) => void) {
@@ -183,9 +183,6 @@ export class RubyWorker {
         }
 
         let rootContents = this.fs.rootContents
-        if (this.prefix != null) {
-            rootContents = (this.fs.rootContents[this.prefix] as Directory).contents
-        }
 
         const wasi = new WASI(
             ["ruby", "-e", code].concat(extraArgs),

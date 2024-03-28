@@ -143,28 +143,32 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
         "Authorization": `token ${localStorage.getItem("GITHUB_TOKEN")}`
     })
     const RubyWorkerClass = Comlink.wrap(new Worker("build/src/ruby.worker.js", { type: "module" })) as unknown as {
-        create(zipBuffer: ArrayBuffer, prefix: string | null, setStatus: (message: string) => void): Promise<RubyWorker>
+        create(zipBuffer: ArrayBuffer, stripComponents: number, setStatus: (message: string) => void): Promise<RubyWorker>
     }
     const initFromZipTarball = async (
-        url: string, prefix: string | null,
+        url: string, stripComponents: number,
         setProgress: (bytes: number, response: Response) => void
     ) => {
         setStatus("Downloading Ruby...")
+        const zipSource = await artifactRegistry.get(url)
+        if (zipSource.status !== 200) {
+            throw new Error(`Failed to download ${url}: ${zipSource.status} ${await zipSource.text()}`)
+        }
         const zipResponse = teeDownloadProgress(
-            await artifactRegistry.get(url),
+            zipSource,
             setProgress
         )
         const zipBuffer = await zipResponse.arrayBuffer();
 
         return async () => {
-            return await RubyWorkerClass.create(zipBuffer, prefix, Comlink.proxy(setStatus))
+            return await RubyWorkerClass.create(zipBuffer, stripComponents, Comlink.proxy(setStatus))
         }
     }
     const initFromGitHubActionsRun = async (runId: string) => {
         const { run, artifact } = await artifactRegistry.getMetadata(runId, "ruby-wasm-install")
         setMetadata(run)
         const size = Number(artifact["size_in_bytes"]);
-        return await initFromZipTarball(artifact["archive_download_url"], null, (bytes, _) => {
+        return await initFromZipTarball(artifact["archive_download_url"], 0, (bytes, _) => {
             const total = size
             const percent = Math.round(bytes / total * 100)
             setStatus(`Downloading Ruby... ${percent}%`)
@@ -172,7 +176,7 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
     }
     const initFromBuiltin = async (version: string) => {
         const url = `build/ruby-${version}.zip`
-        return await initFromZipTarball(url, `${version}-wasm32-unknown-wasi-full`, (bytes, response) => {
+        return await initFromZipTarball(url, 1, (bytes, response) => {
             const total = Number(response.headers.get("Content-Length"))
             const percent = Math.round(bytes / total * 100)
             setStatus(`Downloading Ruby... ${percent}%`)
