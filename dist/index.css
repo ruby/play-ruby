@@ -172,6 +172,11 @@ main {
     margin: 0 0.5rem;
     border-radius: 0.5rem;
     background-color: #ffffff;
+    white-space-collapse: preserve;
+}
+
+.plrb-output-range {
+    text-decoration: underline;
 }
 
 .plrb-icon-button {

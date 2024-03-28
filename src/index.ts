@@ -441,6 +441,60 @@ function initUI(state: UIState) {
     }
 }
 
+interface OutputWriter {
+    write(message: string): void;
+    finalize(): void;
+}
+
+class PlainOutputWriter implements OutputWriter {
+    constructor(private element: HTMLElement) { }
+
+    write(message: string) {
+        this.element.innerText += message
+    }
+    finalize(): void {}
+}
+
+/// Highlight (A,B)-(C,D) as a range in the editor
+class LocationHighlightingOutputWriter implements OutputWriter {
+    private buffered: string = ""
+    constructor(private element: HTMLElement, private editor: monaco.editor.IEditor) {}
+
+    write(message: string) {
+        this.buffered += message
+    }
+    finalize(): void {
+        const rangePattern = /\((\d+),(\d+)\)-\((\d+),(\d+)\)/g
+        // Create spans for each range
+        this.element.innerHTML = ""
+        let lastEnd = 0
+        for (const match of this.buffered.matchAll(rangePattern)) {
+            const [fullMatch, startLine, startColumn, endLine, endColumn] = match
+            const start = this.buffered.slice(lastEnd, match.index)
+            const range = this.buffered.slice(match.index, match.index + fullMatch.length)
+            lastEnd = match.index + fullMatch.length
+            const span = document.createElement("span")
+            span.innerText = start
+            this.element.appendChild(span)
+            const rangeSpan = document.createElement("span")
+            rangeSpan.innerText = range
+            rangeSpan.addEventListener("mouseover", () => {
+                // Highlight the range in the editor
+                // NOTE: Monaco's columns are 1-indexed but Ruby's are 0-indexed
+                const range = new monaco.Range(Number(startLine), Number(startColumn) + 1, Number(endLine), Number(endColumn) + 1)
+                this.editor.revealRangeInCenter(range, monaco.editor.ScrollType.Smooth)
+                this.editor.setSelection(range)
+            })
+            rangeSpan.classList.add("plrb-output-range")
+            this.element.appendChild(rangeSpan)
+        }
+        const end = this.buffered.slice(lastEnd)
+        const span = document.createElement("span")
+        span.innerText = end
+        this.element.appendChild(span)
+    }
+}
+
 async function init() {
     const rubySource = rubySourceFromURL()
     const uiState = stateFromURL();
@@ -502,17 +556,17 @@ async function init() {
             return
         }
         const worker = await makeRubyWorker()
-        const writeOutput = (message: string) => {
-            outputPane.innerText += message
-        }
         const runCode = async (code: string) => {
             const selectedAction = actionSelect.value
             outputPane.innerText = ""
             let args: string[] = []
+            const outputWriter = (selectedAction == "compile" || selectedAction == "syntax" || selectedAction == "syntax+prism")
+                ? new LocationHighlightingOutputWriter(outputPane, editor)
+                : new PlainOutputWriter(outputPane)
             try {
                 args = getOptions().arguments
             } catch (error) {
-                writeOutput(`Error parsing options: ${error.message}\n`)
+                outputWriter.write(`Error parsing options: ${error.message}\n`)
                 return;
             }
             const mainFile = "main.rb"
@@ -522,8 +576,8 @@ async function init() {
                 // Prepend empty lines to the file content to match the original source line
                 codeMap[filename] = "\n".repeat(file.sourceLine + 1) + file.content
             }
-            console.log(codeMap)
-            await worker.run(codeMap, mainFile, selectedAction, args, Comlink.proxy(writeOutput))
+            await worker.run(codeMap, mainFile, selectedAction, args, Comlink.proxy((text) => outputWriter.write(text)))
+            outputWriter.finalize()
         }
         const run = async () => await runCode(getCode());
 
