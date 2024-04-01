@@ -238,6 +238,32 @@ main {
     width: 90%;
 }
 
+.plrb-modal-config-github-sign-in-button {
+    border-radius: 0.25rem;
+    border-width: 1px;
+    border-color: rgb(118, 118, 118);
+    background-color: #6c757d;
+    color: #ffffff;
+    font-size: 100%;
+    font-family: inherit;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    white-space: nowrap;
+}
+
+.plrb-modal-config-github-sign-out-button {
+    border-radius: 0.25rem;
+    border-width: 1px;
+    border-color: rgb(118, 118, 118);
+    background-color: #dc3545;
+    color: #ffffff;
+    font-size: 100%;
+    font-family: inherit;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    white-space: nowrap;
+}
+
 /* Keyboard shortcut table */
 .plrb-shortcut-table {
     border-collapse: collapse;

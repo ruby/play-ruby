@@ -13,104 +13,62 @@ class GitHubAPIError extends Error {
     }
 }
 
-/**
- * Provides access to GitHub Actions artifacts
- */
-class GitHubArtifactRegistry {
-    constructor(private repo: string, private cache: Cache, private headers: HeadersInit) { }
+class PlayRubyService {
+    constructor(public endpoint: string) { }
 
-    private async jsonRequest(url: string, context: string) {
-        const headers = {
-            "Accept": "application/vnd.github.v3+json",
-            ...this.headers,
-        }
-        const response = await fetch(url, { headers })
-        if (!response.ok) {
-            throw new GitHubAPIError(context, response)
-        }
-        return await response.json()
-    }
-
-    async getPullRequestLatestRunId(prNumber: string, workflowPath: string) {
-        const prUrl = `https://api.github.com/repos/${this.repo}/pulls/${prNumber}`
-        const pr = await this.jsonRequest(prUrl, "PR fetch")
-        const headSha = pr["head"]["sha"]
-
-        const runsUrl = `https://api.github.com/repos/${this.repo}/actions/runs?event=pull_request&head_sha=${headSha}`
-        const runs = await this.jsonRequest(runsUrl, "Runs fetch")
-
-        for (const run of runs["workflow_runs"]) {
-            if (run["path"] === workflowPath) {
-                return run["id"]
-            }
-        }
-        throw new Error(`No run for ${workflowPath} in PR ${prNumber}`)
-    }
-
-    async getBranchLatestRunId(branch: string, workflowPath: string) {
-        async function* commits() {
-            let page = 1
-            while (true) {
-                const commitsUrl = `https://api.github.com/repos/${this.repo}/commits?sha=${branch}&page=${page}`
-                const commits = await this.jsonRequest(commitsUrl, "Commits fetch")
-                for (const commit of commits) {
-                    yield commit
-                }
-                if (commits.length === 0) {
-                    break
-                }
-                page++
-            }
-        }
-
-        for await (const commit of commits.call(this)) {
-            const runsUrl = `https://api.github.com/repos/${this.repo}/actions/runs?event=push&branch=${branch}&commit_sha=${commit["sha"]}&status=success&exclude_pull_requests=true`
-            let runs: any;
-            try {
-                runs = await this.jsonRequest(runsUrl, "Runs fetch")
-            } catch (error) {
-                if (error instanceof GitHubAPIError && error.response.status === 404) {
-                    // No runs for this commit
-                    continue
-                }
-                throw error
-            }
-
-            for (const run of runs["workflow_runs"]) {
-                if (run["path"] === workflowPath) {
-                    return run["id"]
-                }
-            }
-        }
+    private fetch(url: string, options: RequestInit) {
+        return fetch(url, { ...options, credentials: "include" })
     }
 
     /**
      * Fetches the metadata for a GitHub Actions run and returns the metadata for the given artifact
-     * @param runId The ID of the GitHub Actions run
-     * @param artifactName The name of the artifact
+     * @param source The source of the artifact (e.g. "run", "pr")
+     * @param payload The payload for the source (e.g. run ID, PR number)
      * @returns The metadata for the artifact in the given run
      */
-    async getMetadata(runId: string, artifactName: string) {
-        const runUrl = `https://api.github.com/repos/${this.repo}/actions/runs/${runId}`
-        const run = await this.jsonRequest(runUrl, "Run fetch")
-        const artifacts = await this.jsonRequest(run["artifacts_url"], "Artifacts fetch")
-
-        const artifact = artifacts["artifacts"].find((artifact: any) => artifact["name"] === artifactName)
-        if (artifact == null) {
-            throw new Error(`No ${artifactName} artifact`)
+    async getDownloadInfo(source: string, payload: string): Promise<{ run: any, artifact: any }> {
+        const url = new URL(this.endpoint)
+        url.pathname = "/download_info"
+        url.searchParams.set("source", source)
+        url.searchParams.set("payload", payload)
+        const response = await this.fetch(url.toString(), {})
+        if (!response.ok) {
+            throw new GitHubAPIError("Download info", response)
         }
-        return { run, artifact }
+        return await response.json()
     }
+
+    signInLink(origin: string) {
+        const url = new URL(this.endpoint)
+        url.pathname = "/sign_in"
+        url.searchParams.set("origin", origin)
+        return url.toString()
+    }
+
+    async signOut() {
+        const url = new URL(this.endpoint)
+        url.pathname = "/sign_out"
+        await this.fetch(url.toString(), {})
+    }
+}
+
+/**
+ * Provides access to GitHub Actions artifacts
+ */
+class GitHubArtifactRegistry {
+    constructor(private cache: Cache) { }
 
     /**
      * Returns the artifact at the given URL, either from the cache or by downloading it
      */
-    async get(artifactUrl: string) {
-        let response = await this.cache.match(artifactUrl)
+    async get(artifactUrl: string, cacheKey: string) {
+        let response = await this.cache.match(cacheKey)
         if (response == null || !response.ok) {
-            response = await fetch(artifactUrl, { headers: this.headers })
+            response = await fetch(artifactUrl)
             if (response.ok) {
-                this.cache.put(artifactUrl, response.clone())
+                this.cache.put(cacheKey, response.clone())
+            } else {
+                throw new GitHubAPIError("Artifact download", response)
             }
         }
         return response
@@ -138,20 +96,18 @@ function teeDownloadProgress(response: Response, setProgress: (bytes: number, re
 }
 
 
-async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: string) => void, setMetadata: (run: any) => void) {
+async function initRubyWorkerClass(rubySource: RubySource, service: PlayRubyService, setStatus: (status: string) => void, setMetadata: (run: any) => void) {
     setStatus("Installing Ruby...")
-    const artifactRegistry = new GitHubArtifactRegistry("ruby/ruby", await caches.open("ruby-wasm-install-v1"), {
-        "Authorization": `token ${localStorage.getItem("GITHUB_TOKEN")}`
-    })
+    const artifactRegistry = new GitHubArtifactRegistry(await caches.open("ruby-wasm-install-v1"))
     const RubyWorkerClass = Comlink.wrap(new Worker("build/src/ruby.worker.js", { type: "module" })) as unknown as {
         create(zipBuffer: ArrayBuffer, stripComponents: number, setStatus: (message: string) => void): Promise<RubyWorker>
     }
     const initFromZipTarball = async (
-        url: string, stripComponents: number,
+        url: string, cacheKey: string, stripComponents: number,
         setProgress: (bytes: number, response: Response) => void
     ) => {
         setStatus("Downloading Ruby...")
-        const zipSource = await artifactRegistry.get(url)
+        const zipSource = await artifactRegistry.get(url, cacheKey)
         if (zipSource.status !== 200) {
             throw new Error(`Failed to download ${url}: ${zipSource.status} ${await zipSource.text()}`)
         }
@@ -165,11 +121,11 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
             return await RubyWorkerClass.create(zipBuffer, stripComponents, Comlink.proxy(setStatus))
         }
     }
-    const initFromGitHubActionsRun = async (runId: string) => {
-        const { run, artifact } = await artifactRegistry.getMetadata(runId, "ruby-wasm-install")
+    const initFromGitHubActionsRun = async (run: any, artifact: any) => {
         setMetadata(run)
         const size = Number(artifact["size_in_bytes"]);
-        return await initFromZipTarball(artifact["archive_download_url"], 0, (bytes, _) => {
+        // archive_download_url might be changed, so use runId as cache key
+        return await initFromZipTarball(artifact["archive_download_url"], run["id"], 0, (bytes, _) => {
             const total = size
             const percent = Math.round(bytes / total * 100)
             setStatus(`Downloading Ruby... ${percent}%`)
@@ -177,7 +133,7 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
     }
     const initFromBuiltin = async (version: string) => {
         const url = `build/ruby-${version}.zip`
-        return await initFromZipTarball(url, 1, (bytes, response) => {
+        return await initFromZipTarball(url, url, 1, (bytes, response) => {
             const total = Number(response.headers.get("Content-Length"))
             const percent = Math.round(bytes / total * 100)
             setStatus(`Downloading Ruby... ${percent}%`)
@@ -186,15 +142,15 @@ async function initRubyWorkerClass(rubySource: RubySource, setStatus: (status: s
 
     const workflowPath = ".github/workflows/wasm.yml"
     switch (rubySource.type) {
-        case "github-actions-run":
+        case "github-actions-run": {
             let runId = rubySource.runId
-            if (rubySource.runId === "latest") {
-                runId = await artifactRegistry.getBranchLatestRunId("master", workflowPath)
-            }
-            return initFromGitHubActionsRun(runId)
-        case "github-pull-request":
-            const actionsRunId = await artifactRegistry.getPullRequestLatestRunId(rubySource.prNumber, workflowPath)
-            return initFromGitHubActionsRun(actionsRunId)
+            const { run, artifact } = await service.getDownloadInfo("run", runId)
+            return initFromGitHubActionsRun(run, artifact)
+        }
+        case "github-pull-request": {
+            const { run, artifact } = await service.getDownloadInfo("pr", rubySource.prNumber)
+            return initFromGitHubActionsRun(run, artifact)
+        }
         case "builtin":
             return initFromBuiltin(rubySource.version)
         default:
@@ -410,7 +366,7 @@ puts RUBY_DESCRIPTION`
     return { code, action, options }
 }
 
-function initUI(state: UIState) {
+function initUI(state: UIState, service: PlayRubyService) {
     const showHelpButton = document.getElementById("button-show-help")
     const helpModal = document.getElementById("modal-help") as HTMLDialogElement
     showHelpButton.addEventListener("click", () => {
@@ -419,16 +375,22 @@ function initUI(state: UIState) {
 
     const showConfigButton = document.getElementById("button-show-config")
     const configModal = document.getElementById("modal-config") as HTMLDialogElement
-    const configGithubToken = document.getElementById("config-github-token") as HTMLInputElement
     showConfigButton.addEventListener("click", () => {
-        configGithubToken.value = localStorage.getItem("GITHUB_TOKEN") ?? ""
         configModal.showModal()
     })
     const configForm = document.getElementById("config-form") as HTMLFormElement
     configForm.addEventListener("submit", (event) => {
         event.preventDefault()
-        localStorage.setItem("GITHUB_TOKEN", configGithubToken.value)
         configModal.close()
+    })
+    const configGitHubSignIn = document.getElementById("config-github-sign-in") as HTMLButtonElement
+    configGitHubSignIn.addEventListener("click", () => {
+        window.open(service.signInLink(location.href).toString(), "_self")
+    })
+    const configGitHubSignOut = document.getElementById("config-github-sign-out") as HTMLButtonElement
+    configGitHubSignOut.addEventListener("click", async () => {
+        await service.signOut()
+        window.location.reload()
     })
 
     for (const modal of [helpModal, configModal]) {
@@ -495,10 +457,12 @@ class LocationHighlightingOutputWriter implements OutputWriter {
     }
 }
 
-async function init() {
+export async function init({ PLAY_RUBY_SERVER_URL }) {
     const rubySource = rubySourceFromURL()
     const uiState = stateFromURL();
-    initUI(uiState);
+
+    const service = new PlayRubyService(PLAY_RUBY_SERVER_URL)
+    initUI(uiState, service);
     const { editor, getOptions, getCode } = initEditor(uiState)
     const buttonRun = document.getElementById("button-run")
     const outputPane = document.getElementById("output")
@@ -511,7 +475,8 @@ async function init() {
     })
 
     const setStatus = (status: string) => {
-        document.getElementById("status").innerText = status
+        const statusElement = document.getElementById("status")
+        statusElement.innerText = status
     }
     const setMetadata = (run: any) => {
         const metadataElement = document.getElementById("metadata") as HTMLSpanElement;
@@ -551,7 +516,7 @@ async function init() {
     }
 
     try {
-        const makeRubyWorker = await initRubyWorkerClass(rubySource, setStatus, setMetadata)
+        const makeRubyWorker = await initRubyWorkerClass(rubySource, service, setStatus, setMetadata)
         if (makeRubyWorker == null) {
             return
         }
@@ -604,4 +569,5 @@ async function init() {
     console.log("init")
 }
 
-init();
+// @ts-ignore
+init({ PLAY_RUBY_SERVER_URL: PLAY_RUBY_SERVER_URL })

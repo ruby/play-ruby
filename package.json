@@ -1,7 +1,8 @@
 {
   "scripts": {
     "build": "node ./bin/build.mjs",
-    "serve": "node ./bin/build.mjs dev",
+    "serve": "node ./bin/build.mjs serve",
+    "serve:all": "node ./bin/build.mjs serve:all",
     "test": "vitest"
   },
   "dependencies": {

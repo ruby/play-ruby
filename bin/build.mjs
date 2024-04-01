@@ -4,24 +4,29 @@ import { spawn } from "node:child_process"
 import fs from "node:fs"
 import https from "node:https"
 
-const buildOptions = {
-    entryPoints: [
-        "src/index.ts", "src/ruby.worker.ts",
-        "./node_modules/monaco-editor/esm/vs/editor/editor.worker.js",
-        "./node_modules/monaco-editor/esm/vs/language/json/json.worker.js",
-    ],
-    bundle: true,
-    format: "esm",
-    outdir: "./dist/build",
-    splitting: true,
-    sourcemap: true,
-    logLevel: "info",
-    loader: {
-        '.ttf': 'file'
-    },
-    plugins: [
-        polyfillNode(),
-    ]
+const SERVER_DEVELOPMENT_PORT = 8090
+const FRONTEND_DEVELOPMENT_PORT = 8091
+function makeBuildOptions(config) {
+    return  {
+        entryPoints: [
+            `src/index.ts`, "src/ruby.worker.ts",
+            "./node_modules/monaco-editor/esm/vs/editor/editor.worker.js",
+            "./node_modules/monaco-editor/esm/vs/language/json/json.worker.js",
+        ],
+        bundle: true,
+        format: "esm",
+        outdir: "./dist/build",
+        splitting: true,
+        sourcemap: true,
+        logLevel: "info",
+        loader: {
+            '.ttf': 'file'
+        },
+        define: Object.fromEntries(Object.entries(config).map(([key, value]) => [key, JSON.stringify(value)])),
+        plugins: [
+            polyfillNode(),
+        ]
+    }
 }
 
 async function downloadBuiltinRuby(version, rubyVersion) {
@@ -66,17 +71,56 @@ async function downloadBuiltinRuby(version, rubyVersion) {
 await downloadBuiltinRuby("2.4.1", "3.2")
 await downloadBuiltinRuby("2.4.1", "3.3")
 
+async function devFrontend(config) {
+    const ctx = await esbuild.context(makeBuildOptions(config))
+    const watch = ctx.watch()
+    spawn("ruby", ["-run", "-e", "httpd", "--", `--port=${FRONTEND_DEVELOPMENT_PORT}`, "./dist"], { stdio: "inherit" })
+    console.log(`Frontend: http://localhost:${FRONTEND_DEVELOPMENT_PORT}`)
+    return watch
+}
+
+function devServer(config) {
+    spawn("bundle", [
+        "exec", "ruby", "run.rb", "-p", String(SERVER_DEVELOPMENT_PORT),
+        "--ssl-cert", "./service/ssl/localhost.crt",
+        "--ssl-key", "./service/ssl/localhost.key",
+    ], {
+        cwd: "./service", stdio: "inherit",
+        env: {
+            ...process.env,
+            ...config
+        }
+    })
+    console.log(`Server: http://localhost:${SERVER_DEVELOPMENT_PORT}`)
+}
+
 const action = process.argv[2] ?? "build"
 switch (action) {
-    case "dev": {
-        const ctx = await esbuild.context(buildOptions)
-        const build = ctx.watch()
-        spawn("ruby", ["-run", "-e", "httpd", "./dist"], { stdio: "inherit" })
-        await build
+    case "serve:all": {
+        const config = {
+            "PLAY_RUBY_SERVER_URL": `https://localhost:${SERVER_DEVELOPMENT_PORT}`,
+            "PLAY_RUBY_FRONTEND_URL": `http://127.0.0.1:${FRONTEND_DEVELOPMENT_PORT}`,
+        }
+
+        const watch = devFrontend(config)
+        devServer(config)
+        await watch
         break
     }
+    case "serve": {
+        const config = {
+            "PLAY_RUBY_SERVER_URL": `https://play-ruby-34872ef1018e.herokuapp.com`,
+            "PLAY_RUBY_FRONTEND_URL": `http://127.0.0.1:${FRONTEND_DEVELOPMENT_PORT}`,
+        }
+        const watch = devFrontend(config)
+        await watch
+    }
     case "build": {
-        await esbuild.build(buildOptions)
+        const config = {
+            "PLAY_RUBY_SERVER_URL": `https://play-ruby-34872ef1018e.herokuapp.com`,
+            "PLAY_RUBY_FRONTEND_URL": `https://ruby.github.io/play-ruby`,
+        }
+        await esbuild.build(makeBuildOptions(config))
         break
     }
     default:
