@@ -82,8 +82,6 @@ async function devFrontend(config) {
 function devServer(config) {
     spawn("bundle", [
         "exec", "ruby", "run.rb", "-p", String(SERVER_DEVELOPMENT_PORT),
-        "--ssl-cert", "./service/ssl/localhost.crt",
-        "--ssl-key", "./service/ssl/localhost.key",
     ], {
         cwd: "./service", stdio: "inherit",
         env: {
@@ -92,13 +90,15 @@ function devServer(config) {
         }
     })
     console.log(`Server: http://localhost:${SERVER_DEVELOPMENT_PORT}`)
+    console.log('Please ensure that you have enabled "Allow invalid certificates for resources loaded from localhost"')
+    console.log('in chrome://flags/#allow-insecure-localhost')
 }
 
 const action = process.argv[2] ?? "build"
 switch (action) {
     case "serve:all": {
         const config = {
-            "PLAY_RUBY_SERVER_URL": `https://localhost:${SERVER_DEVELOPMENT_PORT}`,
+            "PLAY_RUBY_SERVER_URL": `https://127.0.0.1:${SERVER_DEVELOPMENT_PORT}`,
             "PLAY_RUBY_FRONTEND_URL": `http://127.0.0.1:${FRONTEND_DEVELOPMENT_PORT}`,
         }
 

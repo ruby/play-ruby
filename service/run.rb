@@ -7,11 +7,43 @@ require 'net/http'
 require 'octokit'
 
 %w[
+  GITHUB_CLIENT_ID_LOCAL GITHUB_CLIENT_SECRET_LOCAL
   GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET
-  PLAY_RUBY_FRONTEND_URL PLAY_RUBY_SERVER_URL
 ].each do |env|
-  raise "#{env} is required" unless ENV[env]
+  unless ENV[env]
+    raise <<~MSG
+      Missing environment variable: #{env}
+      If you have access to Ruby core team 1Password, you can inject the environment variables by running:
+
+      $ env $(op --account rubylang.1password.com inject -i .env) npm run serve:all
+    MSG
+  end
   Object.const_set(env, ENV[env])
+end
+[
+  ["PLAY_RUBY_FRONTEND_URL", "http://127.0.0.1:8091"],
+  ["PLAY_RUBY_SERVER_URL", "https://127.0.0.1:8090"],
+].each do |env, default|
+  Object.const_set(env, ENV[env] || default)
+end
+
+GITHUB_OAUTH_CONFIG = {
+  "development" => {
+    "GITHUB_OAUTH_CALLBACK_HOST" => "http://127.0.0.1:8091",
+    "GITHUB_CLIENT_ID" => GITHUB_CLIENT_ID_LOCAL,
+    "GITHUB_CLIENT_SECRET" => GITHUB_CLIENT_SECRET_LOCAL,
+  },
+  "production" => {
+    "GITHUB_OAUTH_CALLBACK_HOST" => "https://ruby.github.io/play-ruby",
+    "GITHUB_CLIENT_ID" => GITHUB_CLIENT_ID,
+    "GITHUB_CLIENT_SECRET" => GITHUB_CLIENT_SECRET,
+  }
+}
+
+if development?
+  set :server_settings,
+    SSLEnable: true,
+    SSLCertName: [['CN', WEBrick::Utils.getservername]]
 end
 
 use Rack::Session::Cookie, {
@@ -22,10 +54,22 @@ use Rack::Session::Cookie, {
   assume_ssl: true,
 }
 
+def request_from_localhost?
+  raw_origin = request.env['HTTP_ORIGIN'] || request.env['HTTP_REFERER']
+  return false unless raw_origin
+  origin_host = URI.parse(raw_origin).host
+  origin_host == "localhost" || origin_host == "127.0.0.1"
+end
+
 before do
   current_origin = request.env['HTTP_ORIGIN']
-  headers 'Access-Control-Allow-Origin' => PLAY_RUBY_FRONTEND_URL
+  if request_from_localhost? || GITHUB_OAUTH_CONFIG.map { |k, v| v["GITHUB_OAUTH_CALLBACK_HOST"] }.include?(current_origin)
+    headers 'Access-Control-Allow-Origin' => current_origin
+  end
   headers 'Access-Control-Allow-Credentials' => 'true'
+
+  @github_oauth_config = GITHUB_OAUTH_CONFIG[request_from_localhost? ? "development" : "production"]
+  puts "USING #{request_from_localhost? ? 'LOCAL' : 'PRODUCTION'} GITHUB CLIENT ID"
 end
 
 options '*' do
@@ -39,7 +83,7 @@ def authenticated?
 end
 
 def authenticate!
-  redirect_uri = URI.parse(PLAY_RUBY_FRONTEND_URL)
+  redirect_uri = URI.parse(@github_oauth_config["GITHUB_OAUTH_CALLBACK_HOST"])
   redirect_uri.path = '/callback.html'
   redirect_query = { server_url: PLAY_RUBY_SERVER_URL }
   if params[:origin]
@@ -50,7 +94,7 @@ def authenticate!
   authorize_uri = URI.parse "https://github.com/login/oauth/authorize"
   authorize_uri.query = URI.encode_www_form({
     scope: "public_repo",
-    client_id: GITHUB_CLIENT_ID,
+    client_id: @github_oauth_config["GITHUB_CLIENT_ID"],
     redirect_uri: redirect_uri.to_s
   })
   redirect authorize_uri.to_s
@@ -134,6 +178,7 @@ get '/download_info' do
   repo = "ruby/ruby"
   workflow_path = ".github/workflows/wasm.yml"
 
+  client = Octokit::Client.new(access_token: access_token)
   case params[:source]
   when "run"
     run_id = payload
@@ -144,7 +189,6 @@ get '/download_info' do
     raise "?source= parameter is missing or invalid"
   end
 
-  client = Octokit::Client.new(access_token: access_token)
   if run_id == "latest"
     run_id = GitHubExtras.get_branch_latest_run_id(client, repo: repo, branch: "master", workflow_path: workflow_path)
   end
@@ -188,8 +232,8 @@ get '/callback' do
     }
   )
   request.form_data = {
-    'client_id' => GITHUB_CLIENT_ID,
-    'client_secret' => GITHUB_CLIENT_SECRET,
+    'client_id' => @github_oauth_config['GITHUB_CLIENT_ID'],
+    'client_secret' => @github_oauth_config['GITHUB_CLIENT_SECRET'],
     'code' => session_code
   }
   result = Net::HTTP.start(request.uri.hostname, request.uri.port, use_ssl: true) do |http|

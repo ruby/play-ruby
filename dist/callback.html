@@ -1,8 +1,17 @@
 <!DOCTYPE html>
 <html>
     <script>
+        function showError(params) {
+            const error = params.get('error')
+            const errorDescription = params.get('error_description')
+            document.write('Error: ' + error + ' - ' + errorDescription)
+        }
         async function main() {
             const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('error')) {
+                showError(urlParams)
+                return
+            }
             const code = urlParams.get('code');
             const serverUrl = urlParams.get('server_url');
             const origin = urlParams.get('origin');
@@ -20,6 +29,8 @@
             }
             window.open(origin, '_self')
         }
-        main()
+        main().catch((error) => {
+            document.write('Error: ' + error)
+        })
     </script>
 </html>
