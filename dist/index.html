@@ -111,16 +111,25 @@
             </form>
             <form id="config-form">
                 <h1>Configuration</h1>
-                <h2>GitHub Integration</h2>
-                <p>
-                    If you want to try a Ruby built from a GitHub Action workflow, you need to sign in to GitHub.
-                </p>
-                <p>
-                    <button id="config-github-sign-in" class="plrb-modal-config-github-sign-in-button">Sign in to GitHub</button>
-                    <button id="config-github-sign-out" class="plrb-modal-config-github-sign-out-button">Sign out</button>
-                </p>
-
-                <button type="submit" id="config-save" class="plrb-modal-config-save-button" hidden>Save</button>
+                <section id="config-github-pat">
+                    <h2>GitHub Personal Access Token</h2>
+                    <p>
+                        If you want to try a Ruby built from a GitHub Action workflow, you need to set a GitHub Personal Access Token (PAT) at first.
+                        Please <a href="https://github.com/settings/tokens/new?scopes=public_repo&description=play.ruby-lang.org" target="_blank">create a new PAT</a> with the <code>public_repo</code> scope and set it when you open this page.
+                        <input id="config-github-token" class="plrb-modal-config-input" type="password" placeholder="ghp_***********************************" />
+                    </p>
+                    <button type="submit" id="config-save" class="plrb-modal-config-save-button">Save</button>
+                </section>
+                <section id="config-github-integration">
+                    <h2>GitHub Integration</h2>
+                    <p>
+                        If you want to try a Ruby built from a GitHub Action workflow, you need to sign in to GitHub.
+                    </p>
+                    <p>
+                        <button id="config-github-sign-in" class="plrb-modal-config-github-sign-in-button">Sign in to GitHub</button>
+                        <button id="config-github-sign-out" class="plrb-modal-config-github-sign-out-button">Sign out</button>
+                    </p>
+                </section>
             </form>
         </div>
     </dialog>
