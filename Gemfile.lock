@@ -87,5 +87,8 @@ DEPENDENCIES
   sinatra
   sinatra-contrib (~> 4.0)
 
+RUBY VERSION
+   ruby 3.3.0p0
+
 BUNDLED WITH
    2.5.3
