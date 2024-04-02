@@ -29,12 +29,12 @@ end
 
 GITHUB_OAUTH_CONFIG = {
   "development" => {
-    "GITHUB_OAUTH_CALLBACK_HOST" => "http://127.0.0.1:8091",
+    "GITHUB_OAUTH_CALLBACK_BASEURL" => "http://127.0.0.1:8091/callback.html",
     "GITHUB_CLIENT_ID" => GITHUB_CLIENT_ID_LOCAL,
     "GITHUB_CLIENT_SECRET" => GITHUB_CLIENT_SECRET_LOCAL,
   },
   "production" => {
-    "GITHUB_OAUTH_CALLBACK_HOST" => "https://ruby.github.io/play-ruby",
+    "GITHUB_OAUTH_CALLBACK_BASEURL" => "https://ruby.github.io/play-ruby/callback.html",
     "GITHUB_CLIENT_ID" => GITHUB_CLIENT_ID,
     "GITHUB_CLIENT_SECRET" => GITHUB_CLIENT_SECRET,
   }
@@ -63,7 +63,11 @@ end
 
 before do
   current_origin = request.env['HTTP_ORIGIN']
-  if request_from_localhost? || GITHUB_OAUTH_CONFIG.map { |k, v| v["GITHUB_OAUTH_CALLBACK_HOST"] }.include?(current_origin)
+  valid_frontend_origins = GITHUB_OAUTH_CONFIG.map do |k, v|
+    uri = URI.parse(v["GITHUB_OAUTH_CALLBACK_BASEURL"])
+    "#{uri.scheme}://#{uri.host}"
+  end
+  if request_from_localhost? || valid_frontend_origins.include?(current_origin)
     headers 'Access-Control-Allow-Origin' => current_origin
   end
   headers 'Access-Control-Allow-Credentials' => 'true'
@@ -83,8 +87,7 @@ def authenticated?
 end
 
 def authenticate!
-  redirect_uri = URI.parse(@github_oauth_config["GITHUB_OAUTH_CALLBACK_HOST"])
-  redirect_uri.path = '/callback.html'
+  redirect_uri = URI.parse(@github_oauth_config["GITHUB_OAUTH_CALLBACK_BASEURL"])
   redirect_query = { server_url: PLAY_RUBY_SERVER_URL }
   if params[:origin]
     redirect_query[:origin] = params[:origin]
