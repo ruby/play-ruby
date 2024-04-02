@@ -1,24 +1,25 @@
 <!DOCTYPE html>
 <html>
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        const serverUrl = urlParams.get('server_url');
-        const origin = urlParams.get('origin');
-        const requestUrl = new URL(serverUrl)
-        requestUrl.pathname = '/callback'
-        requestUrl.searchParams.append('code', code)
-        fetch(requestUrl.toString(), { credentials: 'include' })
-            .then(response => {
-                if (!response.ok) {
-                    document.write('Error: ' + response.statusText)
-                    return
-                }
-                if (!origin) {
-                    document.write('Error: origin not provided')
-                    return
-                }
-                window.open(origin, '_self')
-            })
+        async function main() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const serverUrl = urlParams.get('server_url');
+            const origin = urlParams.get('origin');
+            const requestUrl = new URL(serverUrl)
+            requestUrl.pathname = '/callback'
+            requestUrl.searchParams.append('code', code)
+            const response = await fetch(requestUrl.toString(), { credentials: 'include' })
+            if (!response.ok) {
+                document.write('Error: ' + response.statusText)
+                return
+            }
+            if (!origin) {
+                document.write('Error: origin not provided')
+                return
+            }
+            window.open(origin, '_self')
+        }
+        main()
     </script>
 </html>
