@@ -10,7 +10,7 @@
     "@zip.js/zip.js": "^2.7.43",
     "comlink": "^4.4.1",
     "esbuild-plugin-polyfill-node": "^0.3.0",
-    "monaco-editor": "0.44.0",
+    "monaco-editor": "0.48.0",
     "tar-stream": "^3.1.7"
   },
   "devDependencies": {
