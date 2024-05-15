@@ -706,4 +706,4 @@ export async function init(config: PlayRubyConfig) {
 }
 
 // @ts-ignore
-init({ SERVER_URL: PLAY_RUBY_SERVER_URL, ENABLE_GITHUB_INTEGRATION: localStorage.getItem("ENABLE_GITHUB_INTEGRATION") === "true" })
+init({ SERVER_URL: PLAY_RUBY_SERVER_URL, ENABLE_GITHUB_INTEGRATION: true })
