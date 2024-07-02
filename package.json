@@ -1,4 +1,5 @@
 {
+  "name": "play-ruby",
   "scripts": {
     "build": "node ./bin/build.mjs",
     "serve": "node ./bin/build.mjs serve",
