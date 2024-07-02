@@ -1,28 +1,46 @@
-import { Directory, File, OpenFile, PreopenDirectory, SyncOPFSFile, WASI } from "@bjorn3/browser_wasi_shim"
+import { Directory, File, Inode, OpenFile, PreopenDirectory, WASI, wasi } from "@bjorn3/browser_wasi_shim"
 import * as Comlink from "comlink"
 import { IFs, RubyInstall } from "./ruby-install"
 
 
-type IDir = Pick<Directory, "get_entry_for_path" | "create_entry_for_path">;
+type IDir = Pick<Directory, "get_entry_for_path" | "create_entry_for_path" | "contents">;
 
 class WASIFs implements IFs {
-    public rootContents: { [key: string]: File | Directory | SyncOPFSFile } = {}
+    public rootContents: Map<string, Inode> = new Map()
     constructor() { }
 
     private _getRoot(): IDir {
         return {
-            get_entry_for_path: (path: string) => {
-                return this.rootContents[path]
+            contents: this.rootContents,
+            get_entry_for_path: (path) => {
+                if (path.parts.length === 0) {
+                    return { ret: wasi.ERRNO_NOTSUP, entry: null }
+                }
+                let entry = this.rootContents.get(path.parts[0])
+                if (entry == null) {
+                    return { ret: wasi.ERRNO_NOENT, entry: null }
+                }
+                for (let i = 1; i < path.parts.length; i++) {
+                    if (entry instanceof Directory) {
+                        entry = entry.contents.get(path.parts[i])
+                        if (entry == null) {
+                            return { ret: wasi.ERRNO_NOENT, entry: null }
+                        }
+                    } else {
+                        return { ret: wasi.ERRNO_NOTDIR, entry: null }
+                    }
+                }
+                return { ret: wasi.ERRNO_SUCCESS, entry }
             },
-            create_entry_for_path: (path: string, is_dir: boolean) => {
+            create_entry_for_path: (path, is_dir: boolean) => {
                 if (is_dir) {
-                    const dir = new Directory({})
-                    this.rootContents[path] = dir
-                    return dir
+                    const dir = new Directory(new Map())
+                    this.rootContents.set(path, dir)
+                    return { ret: wasi.ERRNO_SUCCESS, entry: dir }
                 } else {
                     const file = new File([])
-                    this.rootContents[path] = file
-                    return file
+                    this.rootContents.set(path, file)
+                    return { ret: wasi.ERRNO_SUCCESS, entry: file }
                 }
             }
         }
@@ -31,9 +49,10 @@ class WASIFs implements IFs {
     private _getDirectoryAtPath(path: string[]): IDir {
         let dir = this._getRoot()
         for (const part of path) {
-            const entry = dir.get_entry_for_path(part)
+            const entry = dir.contents.get(part)
             if (entry == null) {
-                dir = dir.create_entry_for_path(part, true) as Directory
+                const { entry: newEntry } = dir.create_entry_for_path(part, true)
+                dir = newEntry as Directory
             } else if (entry instanceof Directory) {
                 dir = entry
             } else {
@@ -55,9 +74,11 @@ class WASIFs implements IFs {
     /// This is a shallow clone, so the contents of directories under the root are not cloned
     shallowClone(): WASIFs {
         const fs = new WASIFs()
-        fs.rootContents = { ...this.rootContents }
+        fs.rootContents = new Map(this.rootContents)
         return fs
     }
+
+    // "node:fs"-like APIs
 
     mkdirSync(path: string, options?: any): void {
         const parts = this._splitPath(path)
@@ -69,10 +90,11 @@ class WASIFs implements IFs {
             if (part === "") {
                 continue
             }
-            const entry = current.get_entry_for_path(part)
+            const entry = current.contents.get(part)
             if (entry == null) {
                 if (recursive) {
-                    current = current.create_entry_for_path(part, true) as Directory
+                    const { entry: newEntry } = current.create_entry_for_path(part, true)
+                    current = newEntry as Directory
                 } else {
                     throw new Error(`ENOENT: no such file or directory, mkdir '${path}'`)
                 }
@@ -87,14 +109,15 @@ class WASIFs implements IFs {
     writeFileSync(path: string, data: any, options?: any): void {
         const parts = this._splitPath(path)
         const dir = this._getDirectoryAtPath(parts.slice(0, parts.length - 1))
-        const createdFile = dir.create_entry_for_path(parts[parts.length - 1], false) as File
+        const { entry } = dir.create_entry_for_path(parts[parts.length - 1], false)
+        const createdFile = entry as File
         createdFile.data = data
     }
 
     readFileSync(path: string, options?: any): any {
         const parts = this._splitPath(path)
         const dir = this._getDirectoryAtPath(parts.slice(0, parts.length - 1))
-        const file = dir.get_entry_for_path(parts[parts.length - 1]) as File
+        const file = dir.contents.get(parts[parts.length - 1]) as File
         if (file == null) {
             throw new Error(`ENOENT: no such file or directory, open '${path}'`)
         }

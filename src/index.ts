@@ -695,6 +695,7 @@ export async function init(config: PlayRubyConfig) {
         editor.onDidChangeModelContent(() => runOnChange())
         actionSelect.addEventListener("change", () => runOnChange())
     } catch (error) {
+        console.error(error)
         setStatus(error.message)
         if (error instanceof GitHubAPIError && error.isUnauthorized()) {
             const configModal = document.getElementById("modal-config") as HTMLDialogElement
