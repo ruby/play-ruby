@@ -56,7 +56,7 @@ class WASIFs implements IFs {
             } else if (entry instanceof Directory) {
                 dir = entry
             } else {
-                throw new Error(`ENOTDIR: not a directory, open '${path}'`)
+                throw new Error(`ENOTDIR: not a directory, open '${path.join("/")}'`)
             }
         }
         return dir
@@ -122,6 +122,12 @@ class WASIFs implements IFs {
             throw new Error(`ENOENT: no such file or directory, open '${path}'`)
         }
         return file.data
+    }
+
+    readdirSync(path: string, options?: any): string[] {
+        const parts = this._splitPath(path)
+        const dir = this._getDirectoryAtPath(parts)
+        return Array.from(dir.contents.keys())
     }
 }
 
@@ -203,12 +209,46 @@ export class RubyWorker {
         return Comlink.proxy(new RubyWorker(await rubyModule, fs))
     }
 
+    private _rubyVersion(): string {
+        const libRubyDir = "/usr/local/lib/ruby"
+        const libRubyDirContents = this.fs.readdirSync(libRubyDir);
+        for (const maybeVersion of libRubyDirContents) {
+            // Find the first directory that contains rbconfig.rb
+            const versionDir = `${libRubyDir}/${maybeVersion}`
+            const versionDirContents = this.fs.readdirSync(versionDir);
+            for (const maybeArch of versionDirContents) {
+                const archDir = `${versionDir}/${maybeArch}`
+                try {
+                    const archDirContents = this.fs.readdirSync(archDir);
+                    if (archDirContents.includes("rbconfig.rb")) {
+                        return maybeVersion;
+                    }
+                } catch (e) {
+                    // Ignore ENODIR errors
+                }
+            }
+        }
+        console.warn("Could not find Ruby version by looking for rbconfig.rb. Defaulting to 3.3.0");
+        return "3.3.0"
+    }
+
     async run(code: { [path: string]: string }, mainScriptPath: string, action: string, extraArgs: string[], log: (message: string) => void) {
         switch (action) {
             case "eval": break
             case "compile": extraArgs.push("--dump=insns"); break
             case "syntax": extraArgs.push("--dump=parsetree"); break
-            case "syntax+prism": extraArgs.push("--dump=prism_parsetree"); break
+            case "syntax+prism":
+                const rubyVersion = this._rubyVersion();
+                if (rubyVersion.startsWith("3.3.")) {
+                    // --dump=prism_parsetree exists only in 3.3.x
+                    extraArgs.push("--dump=prism_parsetree");
+                } else {
+                    // After 3.3.x, --parser=prism is introduced
+                    // https://bugs.ruby-lang.org/issues/20270
+                    extraArgs.push("--parser=prism");
+                    extraArgs.push("--dump=parsetree");
+                }
+                break
             default: throw new Error(`Unknown action: ${action}`)
         }
 
