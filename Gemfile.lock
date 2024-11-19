@@ -7,13 +7,6 @@ GIT
       base64 (>= 0.1.0)
       rack (>= 3.0.0)
 
-GIT
-  remote: https://github.com/rack/rack.git
-  revision: 8c73aefcc7085c71bdfe6c1ec867f126ede34124
-  ref: 8c73aefcc7085c71bdfe6c1ec867f126ede34124
-  specs:
-    rack (3.0.0)
-
 GEM
   remote: https://rubygems.org/
   specs:
@@ -43,6 +36,7 @@ GEM
     psych (5.1.2)
       stringio
     public_suffix (5.0.4)
+    rack (3.1.8)
     rack-protection (4.0.0)
       base64 (>= 0.1.0)
       rack (>= 3.0.0, < 4)
@@ -81,7 +75,7 @@ PLATFORMS
 DEPENDENCIES
   debug (~> 1.9)
   octokit (~> 8.1)
-  rack!
+  rack (~> 3.1)
   rack-session!
   rackup (~> 2.1)
   sinatra
