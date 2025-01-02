@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@bjorn3/browser_wasi_shim": "^0.3.0",
-    "@zip.js/zip.js": "^2.7.53",
+    "@zip.js/zip.js": "^2.7.54",
     "comlink": "^4.4.2",
     "esbuild-plugin-polyfill-node": "^0.3.0",
     "monaco-editor": "0.52.2",
