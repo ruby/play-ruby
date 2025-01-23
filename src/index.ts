@@ -307,7 +307,7 @@ function rubySourceFromURL(): RubySource | null {
             return { type: "builtin", version: value }
         }
     }
-    return { type: "builtin", version: "3.3" }
+    return { type: "builtin", version: "3.4" }
 }
 
 type Options = {

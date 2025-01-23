@@ -30,7 +30,7 @@ function makeBuildOptions(config) {
 }
 
 async function downloadBuiltinRuby(version, rubyVersion) {
-    const tarball = `ruby-${rubyVersion}-wasm32-unknown-wasi-full.tar.gz`
+    const tarball = `ruby-${rubyVersion}-wasm32-unknown-wasip1-full.tar.gz`
     const url = `https://github.com/ruby/ruby.wasm/releases/download/${version}/${tarball}`
     const destination = `./dist/build/ruby-${rubyVersion}/install.tar.gz`
     const zipDest = `./dist/build/ruby-${rubyVersion}.zip`
@@ -68,8 +68,9 @@ async function downloadBuiltinRuby(version, rubyVersion) {
     }
 }
 
-await downloadBuiltinRuby("2.4.1", "3.2")
-await downloadBuiltinRuby("2.4.1", "3.3")
+await downloadBuiltinRuby("2.7.1", "3.2")
+await downloadBuiltinRuby("2.7.1", "3.3")
+await downloadBuiltinRuby("2.7.1", "3.4")
 
 async function devFrontend(config) {
     const ctx = await esbuild.context(makeBuildOptions(config))
