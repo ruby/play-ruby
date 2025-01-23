@@ -236,19 +236,23 @@ export class RubyWorker {
         switch (action) {
             case "eval": break
             case "compile": extraArgs.push("--dump=insns"); break
-            case "syntax": extraArgs.push("--dump=parsetree"); break
-            case "syntax+prism":
+            case "syntax": {
                 const rubyVersion = this._rubyVersion();
-                if (rubyVersion.startsWith("3.3.")) {
-                    // --dump=prism_parsetree exists only in 3.3.x
-                    extraArgs.push("--dump=prism_parsetree");
+                if (rubyVersion.startsWith("3.2.")) {
+                    // 3.2.x and earlier do not have explicit --parser=parse.y
+                    extraArgs.push("--dump=parsetree");
                 } else {
-                    // After 3.3.x, --parser=prism is introduced
-                    // https://bugs.ruby-lang.org/issues/20270
-                    extraArgs.push("--parser=prism");
+                    // 3.3.x and later have --parser=parse.y
+                    extraArgs.push("--parser=parse.y");
                     extraArgs.push("--dump=parsetree");
                 }
                 break
+            }
+            case "syntax+prism": {
+                extraArgs.push("--parser=prism");
+                extraArgs.push("--dump=parsetree");
+                break
+            }
             default: throw new Error(`Unknown action: ${action}`)
         }
 
