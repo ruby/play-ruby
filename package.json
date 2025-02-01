@@ -7,7 +7,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@bjorn3/browser_wasi_shim": "^0.3.0",
+    "@bjorn3/browser_wasi_shim": "^0.4.0",
     "@zip.js/zip.js": "^2.7.54",
     "comlink": "^4.4.2",
     "esbuild-plugin-polyfill-node": "^0.3.0",
