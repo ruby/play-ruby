@@ -310,8 +310,14 @@ function rubySourceFromURL(): RubySource | null {
     return { type: "builtin", version: "3.4" }
 }
 
-type Options = {
+export type Options = {
     arguments: string[],
+    env: Record<string, string>,
+}
+
+const DEFAULT_OPTIONS: Options = {
+    arguments: [],
+    env: {},
 }
 
 type UIState = {
@@ -483,9 +489,7 @@ puts RUBY_DESCRIPTION`
 
     let options = JSON.parse(query.get("options")) as Options | null
     if (options == null) {
-        options = {
-            arguments: [],
-        }
+        options = DEFAULT_OPTIONS
     }
 
     return { code, action, options }
@@ -660,12 +664,12 @@ export async function init(config: PlayRubyConfig) {
         const runCode = async (code: string) => {
             const selectedAction = actionSelect.value
             outputPane.innerText = ""
-            let args: string[] = []
+            let options: Options = DEFAULT_OPTIONS
             const outputWriter = (selectedAction == "compile" || selectedAction == "syntax" || selectedAction == "syntax+prism")
                 ? new LocationHighlightingOutputWriter(outputPane, editor)
                 : new PlainOutputWriter(outputPane)
             try {
-                args = getOptions().arguments
+                options = getOptions()
             } catch (error) {
                 outputWriter.write(`Error parsing options: ${error.message}\n`)
                 return;
@@ -677,7 +681,7 @@ export async function init(config: PlayRubyConfig) {
                 // Prepend empty lines to the file content to match the original source line
                 codeMap[filename] = "\n".repeat(file.sourceLine + 1) + file.content
             }
-            await worker.run(codeMap, mainFile, selectedAction, args, Comlink.proxy((text) => outputWriter.write(text)))
+            await worker.run(codeMap, mainFile, selectedAction, options, Comlink.proxy((text) => outputWriter.write(text)))
             outputWriter.finalize()
         }
         const run = async () => await runCode(getCode());

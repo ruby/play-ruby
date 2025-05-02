@@ -1,6 +1,7 @@
 import { Directory, File, Inode, OpenFile, PreopenDirectory, WASI, wasi } from "@bjorn3/browser_wasi_shim"
 import * as Comlink from "comlink"
 import { IFs, RubyInstall } from "./ruby-install"
+import type { Options } from "./index"
 
 
 type IDir = Pick<Directory, "get_entry_for_path" | "create_entry_for_path" | "contents">;
@@ -232,7 +233,8 @@ export class RubyWorker {
         return "3.3.0"
     }
 
-    async run(code: { [path: string]: string }, mainScriptPath: string, action: string, extraArgs: string[], log: (message: string) => void) {
+    async run(code: { [path: string]: string }, mainScriptPath: string, action: string, options: Options, log: (message: string) => void) {
+        const extraArgs: string[] = options.arguments
         switch (action) {
             case "eval": break
             case "compile": extraArgs.push("--dump=insns"); break
@@ -267,7 +269,7 @@ export class RubyWorker {
         // Run the Ruby module with the given code
         const wasi = new WASI(
             ["ruby"].concat(extraArgs).concat([mainScriptPath]),
-            [],
+            Object.entries(options.env).map(([key, value]) => `${key}=${value}`),
             [
                 new OpenFile(new File([])), // stdin
                 new OpenFile(new File([])), // stdout
