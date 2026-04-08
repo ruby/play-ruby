@@ -10,8 +10,8 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    addressable (2.8.6)
-      public_suffix (>= 2.0.2, < 6.0)
+    addressable (2.9.0)
+      public_suffix (>= 2.0.2, < 8.0)
     base64 (0.3.0)
     debug (1.9.2)
       irb (~> 1.10)
@@ -39,7 +39,7 @@ GEM
       sawyer (~> 0.9)
     psych (5.1.2)
       stringio
-    public_suffix (5.0.4)
+    public_suffix (7.0.5)
     rack (3.1.21)
     rack-protection (4.2.0)
       base64 (>= 0.1.0)
